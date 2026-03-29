@@ -1,0 +1,43 @@
+<?php
+
+use App\Controllers\AuthController;
+use App\Controllers\ArchiveController;
+use App\Controllers\DashboardController;
+use App\Controllers\NoticeController;
+use App\Controllers\ProfileController;
+use App\Controllers\PublicNoticeController;
+use App\Controllers\UserController;
+use App\Controllers\VerificationController;
+use App\Controllers\WorkflowValidationController;
+
+router()->get('/', [PublicNoticeController::class, 'index']);
+router()->get('/public/notices/{id}', [PublicNoticeController::class, 'show']);
+router()->get('/public/notices/{id}/file', [PublicNoticeController::class, 'file']);
+router()->get('/login', [AuthController::class, 'showLogin']);
+router()->post('/login', [AuthController::class, 'login']);
+router()->get('/register', [AuthController::class, 'showRegister']);
+router()->post('/register', [AuthController::class, 'register']);
+router()->post('/logout', [AuthController::class, 'logout']);
+router()->get('/verify', [VerificationController::class, 'showVerify']);
+router()->post('/verify', [VerificationController::class, 'verify']);
+router()->get('/email-change/verify', [VerificationController::class, 'verifyEmailChange']);
+router()->get('/dashboard', [DashboardController::class, 'index']);
+router()->get('/users', [UserController::class, 'index']);
+router()->post('/users/{id}/update', [UserController::class, 'update']);
+router()->post('/users/{id}/toggle-active', [UserController::class, 'toggleActive']);
+router()->post('/users/{id}/delete', [UserController::class, 'destroy']);
+router()->get('/profile', [ProfileController::class, 'show']);
+router()->post('/profile/password', [ProfileController::class, 'updatePassword']);
+router()->get('/notices', [NoticeController::class, 'index']);
+router()->get('/notices/create', [NoticeController::class, 'create']);
+router()->post('/notices', [NoticeController::class, 'store']);
+router()->get('/notices/related/create', [NoticeController::class, 'createRelated']);
+router()->post('/notices/related', [NoticeController::class, 'storeRelated']);
+router()->get('/notices/{id}', [NoticeController::class, 'show']);
+router()->get('/notices/{id}/file', [NoticeController::class, 'file']);
+router()->get('/notices/{id}/edit', [NoticeController::class, 'edit']);
+router()->post('/notices/{id}/update', [NoticeController::class, 'update']);
+router()->post('/notices/{id}/delete', [NoticeController::class, 'destroy']);
+router()->post('/notices/{id}/archive', [ArchiveController::class, 'archive']);
+router()->post('/notices/{id}/unarchive', [ArchiveController::class, 'unarchive']);
+router()->get('/api/workflow/eligible-bids', [WorkflowValidationController::class, 'eligibleBids']);

@@ -1,0 +1,1 @@
+auth_user|a:7:{s:2:"id";i:1;s:8:"username";s:6:"admin1";s:9:"firstname";s:6:"System";s:8:"lastname";s:13:"Administrator";s:6:"region";s:3:"NCR";s:4:"role";s:5:"admin";s:5:"email";s:20:"admin1@agency.gov.ph";}_csrf_token|s:64:"862c8b61c62aba27f7453702fd0a7c14e9212b4aed0704e833f9aa278e2088d3";
