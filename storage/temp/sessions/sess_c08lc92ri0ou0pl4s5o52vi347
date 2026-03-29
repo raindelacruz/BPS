@@ -1,1 +1,0 @@
-auth_user|a:7:{s:2:"id";i:1;s:8:"username";s:7:"author1";s:9:"firstname";s:4:"Test";s:8:"lastname";s:6:"Author";s:6:"region";s:3:"NCR";s:4:"role";s:6:"author";s:5:"email";s:22:"author1@example.gov.ph";}_csrf_token|s:64:"dd1901fe6ac56de0cbd2bc13a894ff3802ba6b7b670e1fd4bea9dd94a583dcfb";
