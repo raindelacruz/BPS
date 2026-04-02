@@ -224,6 +224,25 @@ class User extends BaseModel
         ]);
     }
 
+    public function updateProfileById(int $id, array $data): bool
+    {
+        $statement = $this->connection()->prepare(
+            'UPDATE users
+             SET email = :email,
+                 region = :region,
+                 branch = :branch,
+                 updated_at = NOW()
+             WHERE id = :id'
+        );
+
+        return $statement->execute([
+            'id' => $id,
+            'email' => $data['email'],
+            'region' => $data['region'],
+            'branch' => $data['branch'] ?: null,
+        ]);
+    }
+
     public function deleteById(int $id): bool
     {
         $statement = $this->connection()->prepare('DELETE FROM users WHERE id = :id');

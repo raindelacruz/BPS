@@ -66,8 +66,7 @@ class AuthController extends BaseController
         $result = $this->authService->register($_POST);
 
         if ($result['success']) {
-            $email = urlencode((string) ($_POST['email'] ?? ''));
-            $this->redirect('verify?email=' . $email);
+            $this->redirect('login');
         }
 
         $this->view('auth/register', [

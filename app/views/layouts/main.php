@@ -318,16 +318,38 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             gap: 10px;
             margin: 12px 0;
         }
+        .profile-summary-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            align-items: stretch;
+        }
         .detail-grid div {
             background: var(--panel-soft);
             border: 1px solid var(--line);
             border-radius: 14px;
             padding: 12px;
         }
+        .profile-summary-grid div {
+            min-height: 92px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
         .card-section {
             border-top: 1px solid var(--line);
             padding-top: 16px;
             margin-top: 16px;
+        }
+        @media (max-width: 1100px) {
+            .profile-summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 640px) {
+            .profile-summary-grid {
+                grid-template-columns: 1fr;
+            }
         }
         dt {
             font-weight: 700;

@@ -6,20 +6,15 @@ use App\Helpers\RegionBranchHelper;
 use App\Helpers\SessionHelper;
 use App\Models\User;
 use Bootstrap\Database;
-use DateInterval;
-use DateTimeImmutable;
 use Throwable;
 
 class AuthService extends BaseService
 {
     private User $users;
 
-    private EmailService $emailService;
-
-    public function __construct(?User $users = null, ?EmailService $emailService = null)
+    public function __construct(?User $users = null)
     {
         $this->users = $users ?? new User();
-        $this->emailService = $emailService ?? new EmailService();
     }
 
     public function register(array $input): array
@@ -30,11 +25,6 @@ class AuthService extends BaseService
         if ($errors !== []) {
             return ['success' => false, 'errors' => $errors];
         }
-
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $expiresAt = (new DateTimeImmutable())->add(
-            new DateInterval('PT' . max(1, (int) app('app.verification_code_expiry_minutes', 15)) . 'M')
-        );
 
         $connection = Database::connection();
         $connection->beginTransaction();
@@ -50,27 +40,15 @@ class AuthService extends BaseService
                 'password' => password_hash($data['password'], PASSWORD_DEFAULT),
                 'role' => 'author',
                 'email' => $data['email'],
-                'verification_code' => $code,
-                'token_expiry' => $expiresAt->format('Y-m-d H:i:s'),
-                'is_verified' => 0,
+                'verification_code' => null,
+                'token_expiry' => null,
+                'is_verified' => 1,
                 'is_active' => 0,
             ]);
 
-            $displayName = trim($data['firstname'] . ' ' . $data['lastname']);
-            $sent = $this->emailService->sendRegistrationVerification(
-                $data['email'],
-                $displayName,
-                $code,
-                $expiresAt
-            );
-
-            if (!$sent) {
-                throw new \RuntimeException('Verification email could not be sent.');
-            }
-
             $connection->commit();
 
-            SessionHelper::flash('success', 'Registration complete. Check your verification code to activate your account.');
+            SessionHelper::flash('success', 'Registration complete. Your account is awaiting activation.');
 
             return [
                 'success' => true,
@@ -158,7 +136,7 @@ class AuthService extends BaseService
         }
 
         if ((int) $user['is_active'] !== 1) {
-            return ['success' => false, 'errors' => ['Your account is not active yet. Please complete verification first.']];
+            return ['success' => false, 'errors' => ['Your account is not active yet. Please wait for account activation.']];
         }
 
         SessionHelper::put('auth_user', [
@@ -184,14 +162,9 @@ class AuthService extends BaseService
 
     public function changePassword(int $userId, array $input): array
     {
-        $currentPassword = (string) ($input['current_password'] ?? '');
         $newPassword = (string) ($input['password'] ?? '');
         $confirmation = (string) ($input['password_confirmation'] ?? '');
         $errors = [];
-
-        if ($currentPassword === '') {
-            $errors[] = 'Current password is required.';
-        }
 
         if ($newPassword === '') {
             $errors[] = 'New password is required.';
@@ -207,8 +180,8 @@ class AuthService extends BaseService
 
         $user = $this->users->findById($userId);
 
-        if (!$user || !password_verify($currentPassword, (string) ($user['password'] ?? ''))) {
-            $errors[] = 'Current password is incorrect.';
+        if (!$user) {
+            $errors[] = 'User not found.';
         }
 
         if ($errors !== []) {
@@ -222,6 +195,72 @@ class AuthService extends BaseService
         }
 
         SessionHelper::flash('success', 'Password updated successfully.');
+
+        return ['success' => true, 'errors' => []];
+    }
+
+    public function updateProfile(int $userId, array $input): array
+    {
+        $user = $this->users->findById($userId);
+
+        if (!$user) {
+            return ['success' => false, 'errors' => ['Profile not found.']];
+        }
+
+        $data = [
+            'email' => strtolower(trim((string) ($input['email'] ?? ''))),
+            'region' => trim((string) ($input['region'] ?? '')),
+            'branch' => trim((string) ($input['branch'] ?? '')),
+        ];
+
+        $errors = [];
+
+        foreach (['email', 'region', 'branch'] as $field) {
+            if ($data[$field] === '') {
+                $errors[] = ucfirst($field) . ' is required.';
+            }
+        }
+
+        if ($data['region'] !== '' && !RegionBranchHelper::isValidRegion($data['region'])) {
+            $errors[] = 'Region is invalid.';
+        }
+
+        if (
+            $data['region'] !== ''
+            && $data['branch'] !== ''
+            && !RegionBranchHelper::branchBelongsToRegion($data['region'], $data['branch'])
+        ) {
+            $errors[] = 'Branch does not match the selected region.';
+        }
+
+        if (!preg_match('/^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.gov\.ph$/i', $data['email'])) {
+            $errors[] = 'Email must use a valid .gov.ph address.';
+        }
+
+        if ($this->users->emailExistsForOther($data['email'], $userId)) {
+            $errors[] = 'Email is already in use.';
+        }
+
+        if ($errors !== []) {
+            return [
+                'success' => false,
+                'errors' => $errors,
+                'data' => array_merge($user, $data),
+            ];
+        }
+
+        $updated = $this->users->updateProfileById($userId, $data);
+
+        if (!$updated) {
+            return [
+                'success' => false,
+                'errors' => ['Profile could not be updated.'],
+                'data' => array_merge($user, $data),
+            ];
+        }
+
+        $this->refreshSessionUser($userId);
+        SessionHelper::flash('success', 'Profile updated successfully.');
 
         return ['success' => true, 'errors' => []];
     }

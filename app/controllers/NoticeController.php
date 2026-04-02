@@ -96,6 +96,8 @@ class NoticeController extends BaseController
     public function createRelated(array $params = []): void
     {
         SecurityHelper::requireAuth();
+        $user = $this->currentNoticeUser();
+        $branch = trim((string) ($user['branch'] ?? ''));
 
         $selectedType = strtolower(trim((string) ($_GET['type'] ?? '')));
         $selectedBidId = (int) ($_GET['bid_id'] ?? 0);
@@ -103,7 +105,7 @@ class NoticeController extends BaseController
             ResponseHelper::abort(400, 'Invalid related notice type.');
         }
 
-        $eligibleBids = $selectedType !== '' ? $this->prerequisites->eligibleParentBids($selectedType) : [];
+        $eligibleBids = $selectedType !== '' ? $this->prerequisites->eligibleParentBids($selectedType, $branch) : [];
         if ($selectedBidId > 0 && $selectedType !== '') {
             $eligibleIds = array_map(static fn (array $bid): int => (int) $bid['id'], $eligibleBids);
             if (!in_array($selectedBidId, $eligibleIds, true)) {
@@ -118,6 +120,7 @@ class NoticeController extends BaseController
             'relatedTypes' => $this->validation->relatedTypes(),
             'eligibleBids' => $eligibleBids,
             'selectedType' => $selectedType,
+            'assignedBranch' => $branch,
         ]);
     }
 
@@ -204,9 +207,11 @@ class NoticeController extends BaseController
         SecurityHelper::requireAuth();
         $this->enforceCsrf();
 
+        $user = $this->currentNoticeUser();
+        $branch = trim((string) ($user['branch'] ?? ''));
         $validation = $this->validation->validateRelatedNotice($_POST, $_FILES['notice_pdf'] ?? null);
         $type = $validation['data']['type'] ?? '';
-        $eligibleBids = $type !== '' ? $this->prerequisites->eligibleParentBids($type) : [];
+        $eligibleBids = $type !== '' ? $this->prerequisites->eligibleParentBids($type, $branch) : [];
 
         if ($validation['errors'] !== []) {
             $this->view('notice/related-create', [
@@ -216,12 +221,13 @@ class NoticeController extends BaseController
                 'relatedTypes' => $this->validation->relatedTypes(),
                 'eligibleBids' => $eligibleBids,
                 'selectedType' => $type,
+                'assignedBranch' => $branch,
             ]);
             return;
         }
 
         $bid = $this->statusService->synchronizeNotice($this->loadNotice((int) $validation['data']['selected_bid_id']));
-        $guard = $this->prerequisites->validateForBid($type, $bid);
+        $guard = $this->prerequisites->validateForBid($type, $bid, null, $branch);
 
         if (!$guard['allowed']) {
             $this->view('notice/related-create', [
@@ -231,6 +237,7 @@ class NoticeController extends BaseController
                 'relatedTypes' => $this->validation->relatedTypes(),
                 'eligibleBids' => $eligibleBids,
                 'selectedType' => $type,
+                'assignedBranch' => $branch,
             ]);
             return;
         }
@@ -241,7 +248,6 @@ class NoticeController extends BaseController
 
         try {
             $filePath = $this->uploads->storeNoticePdf($_FILES['notice_pdf']);
-            $user = SecurityHelper::currentUser();
             $noticeId = $this->notices->create(
                 $this->workflow->buildRelatedNoticePayload(
                     $type,
@@ -272,6 +278,7 @@ class NoticeController extends BaseController
                 'relatedTypes' => $this->validation->relatedTypes(),
                 'eligibleBids' => $eligibleBids,
                 'selectedType' => $type,
+                'assignedBranch' => $branch,
             ]);
         }
     }

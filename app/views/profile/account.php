@@ -7,7 +7,7 @@ use App\Helpers\ViewHelper;
 <div class="page-head">
     <div>
         <h1>My Account</h1>
-        <p>View your account details and update your password.</p>
+        <p>Update your account details and password.</p>
     </div>
 </div>
 
@@ -19,7 +19,15 @@ use App\Helpers\ViewHelper;
     </div>
 <?php endif; ?>
 
-<dl class="detail-grid">
+<?php if (!empty($profileErrors)): ?>
+    <div class="flash">
+        <?php foreach ($profileErrors as $error): ?>
+            <div><?= ViewHelper::escape($error); ?></div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
+<dl class="detail-grid profile-summary-grid">
     <div>
         <dt>Username</dt>
         <dd><?= ViewHelper::escape($user['username']); ?></dd>
@@ -27,18 +35,6 @@ use App\Helpers\ViewHelper;
     <div>
         <dt>Name</dt>
         <dd><?= ViewHelper::escape(trim($user['firstname'] . ' ' . $user['lastname'])); ?></dd>
-    </div>
-    <div>
-        <dt>Email</dt>
-        <dd><?= ViewHelper::escape($user['email']); ?></dd>
-    </div>
-    <div>
-        <dt>Region</dt>
-        <dd><?= ViewHelper::escape($user['region']); ?></dd>
-    </div>
-    <div>
-        <dt>Branch</dt>
-        <dd><?= ViewHelper::escape($user['branch'] ?? 'Not assigned'); ?></dd>
     </div>
     <div>
         <dt>Role</dt>
@@ -53,17 +49,51 @@ use App\Helpers\ViewHelper;
 <div class="card-section stack-sm">
     <div class="page-head">
         <div>
+            <h2>Account Details</h2>
+            <p>Update your email, region, and branch assignment.</p>
+        </div>
+    </div>
+    <form method="POST" action="<?= ViewHelper::escape(ResponseHelper::url('profile')); ?>" class="form-grid two-col">
+        <input type="hidden" name="_token" value="<?= ViewHelper::escape(SecurityHelper::csrfToken()); ?>">
+
+        <div>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" value="<?= ViewHelper::escape($user['email']); ?>" required>
+        </div>
+
+        <div></div>
+
+        <?php
+        $regionFieldId = 'region';
+        $branchFieldId = 'branch';
+        $selectedRegion = $user['region'] ?? '';
+        $selectedBranch = $user['branch'] ?? '';
+        require __DIR__ . '/../partials/region_branch_fields.php';
+        ?>
+
+        <div class="btn-row" style="grid-column: 1 / -1;">
+            <button type="submit">Update profile</button>
+        </div>
+    </form>
+</div>
+
+<?php if (!empty($passwordErrors)): ?>
+    <div class="flash">
+        <?php foreach ($passwordErrors as $error): ?>
+            <div><?= ViewHelper::escape($error); ?></div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
+<div class="card-section stack-sm">
+    <div class="page-head">
+        <div>
             <h2>Change Password</h2>
             <p>Keep your account secure by updating your password when needed.</p>
         </div>
     </div>
     <form method="POST" action="<?= ViewHelper::escape(ResponseHelper::url('profile/password')); ?>" class="form-grid two-col">
         <input type="hidden" name="_token" value="<?= ViewHelper::escape(SecurityHelper::csrfToken()); ?>">
-
-        <div>
-            <label for="current_password">Current password</label>
-            <input id="current_password" name="current_password" type="password" required>
-        </div>
 
         <div>
             <label for="password">New password</label>
@@ -80,3 +110,5 @@ use App\Helpers\ViewHelper;
         </div>
     </form>
 </div>
+
+<?php require __DIR__ . '/../partials/region_branch_script.php'; ?>

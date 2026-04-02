@@ -245,6 +245,28 @@ class Notice extends BaseModel
         return $statement->fetchAll() ?: [];
     }
 
+    public function findActiveNonArchivedBidsByBranch(string $branch): array
+    {
+        $statement = $this->connection()->prepare(
+            'SELECT n.*, u.username AS uploader_username, u.firstname, u.lastname
+             FROM notices n
+             INNER JOIN users u ON u.id = n.uploaded_by
+             WHERE n.type = :type
+               AND n.status = :status
+               AND n.is_archived = 0
+               AND n.branch = :branch
+             ORDER BY n.start_date DESC, n.id DESC'
+        );
+
+        $statement->execute([
+            'type' => 'bid',
+            'status' => 'active',
+            'branch' => $branch,
+        ]);
+
+        return $statement->fetchAll() ?: [];
+    }
+
     public function hasActiveNonArchivedType(
         string $referenceCode,
         string $type,

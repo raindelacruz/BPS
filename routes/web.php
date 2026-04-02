@@ -27,6 +27,7 @@ router()->post('/users/{id}/update', [UserController::class, 'update']);
 router()->post('/users/{id}/toggle-active', [UserController::class, 'toggleActive']);
 router()->post('/users/{id}/delete', [UserController::class, 'destroy']);
 router()->get('/profile', [ProfileController::class, 'show']);
+router()->post('/profile', [ProfileController::class, 'update']);
 router()->post('/profile/password', [ProfileController::class, 'updatePassword']);
 router()->get('/notices', [NoticeController::class, 'index']);
 router()->get('/notices/create', [NoticeController::class, 'create']);

@@ -12,15 +12,20 @@ class PrerequisiteService extends BaseService
     ) {
     }
 
-    public function eligibleParentBids(string $targetType): array
+    public function eligibleParentBids(string $targetType, ?string $branch = null): array
     {
         $noticeModel = $this->notices ?? new Notice();
         $statusService = $this->statusService ?? new DateStatusService($noticeModel);
-        $bids = $statusService->synchronizeCollection($noticeModel->findActiveNonArchivedBids());
+        $branch = $branch !== null ? trim($branch) : null;
+        $bids = $statusService->synchronizeCollection(
+            $branch !== null && $branch !== ''
+                ? $noticeModel->findActiveNonArchivedBidsByBranch($branch)
+                : []
+        );
         $eligible = [];
 
         foreach ($bids as $bid) {
-            $check = $this->validateForBid($targetType, $bid);
+            $check = $this->validateForBid($targetType, $bid, null, $branch);
 
             if ($check['allowed']) {
                 $eligible[] = $bid;
@@ -30,13 +35,23 @@ class PrerequisiteService extends BaseService
         return $eligible;
     }
 
-    public function validateForBid(string $targetType, array $bid, ?int $ignoreNoticeId = null): array
+    public function validateForBid(
+        string $targetType,
+        array $bid,
+        ?int $ignoreNoticeId = null,
+        ?string $branch = null
+    ): array
     {
         $noticeModel = $this->notices ?? new Notice();
         $type = strtolower(trim($targetType));
+        $branch = $branch !== null ? trim($branch) : null;
 
         if (($bid['type'] ?? null) !== 'bid') {
             return ['allowed' => false, 'errors' => ['Selected parent notice must be a bid.']];
+        }
+
+        if ($branch !== null && $branch !== '' && trim((string) ($bid['branch'] ?? '')) !== $branch) {
+            return ['allowed' => false, 'errors' => ['Selected bid must belong to your branch.']];
         }
 
         if ((int) ($bid['is_archived'] ?? 0) === 1 || ($bid['status'] ?? null) !== 'active') {
