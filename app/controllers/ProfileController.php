@@ -5,8 +5,8 @@ namespace App\Controllers;
 use App\Helpers\RegionBranchHelper;
 use App\Helpers\ResponseHelper;
 use App\Helpers\SecurityHelper;
-use App\Models\User;
 use App\Services\AuthService;
+use App\Models\User;
 
 class ProfileController extends BaseController
 {
@@ -31,12 +31,24 @@ class ProfileController extends BaseController
             ResponseHelper::abort(404, 'Profile not found.');
         }
 
+        $profileState = $this->formState('profile-details', [
+            'email' => $user['email'] ?? '',
+            'region' => $user['region'] ?? '',
+            'branch' => $user['branch'] ?? '',
+        ]);
+        $passwordState = $this->formState('profile-password', [
+            'password' => '',
+            'password_confirmation' => '',
+        ]);
+
         $this->view('profile/account', [
             'title' => 'My Account',
             'user' => $user,
             'errors' => [],
-            'profileErrors' => [],
-            'passwordErrors' => [],
+            'profileErrors' => $profileState['errors'],
+            'profileOld' => $profileState['old'],
+            'passwordErrors' => $passwordState['errors'],
+            'passwordOld' => $passwordState['old'],
             'regions' => RegionBranchHelper::regions(),
         ]);
     }
@@ -44,23 +56,22 @@ class ProfileController extends BaseController
     public function update(array $params = []): void
     {
         SecurityHelper::requireAuth();
-
-        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            ResponseHelper::abort(419, 'Invalid CSRF token.');
-        }
+        $old = [
+            'email' => trim((string) ($_POST['email'] ?? '')),
+            'region' => trim((string) ($_POST['region'] ?? '')),
+            'branch' => trim((string) ($_POST['branch'] ?? '')),
+        ];
+        $this->enforceCsrfOrRedirect('profile', 'profile-details', $old);
 
         $currentUser = SecurityHelper::currentUser();
         $result = $this->authService->updateProfile((int) ($currentUser['id'] ?? 0), $_POST);
 
         if (!$result['success']) {
-            $user = $result['data'] ?? $this->users->findById((int) ($currentUser['id'] ?? 0));
-            $this->view('profile/account', [
-                'title' => 'My Account',
-                'user' => $user,
-                'errors' => [],
-                'profileErrors' => $result['errors'],
-                'passwordErrors' => [],
-                'regions' => RegionBranchHelper::regions(),
+            $data = $result['data'] ?? [];
+            $this->redirectWithValidation('profile', 'profile-details', $result['errors'], [
+                'email' => $data['email'] ?? $old['email'],
+                'region' => $data['region'] ?? $old['region'],
+                'branch' => $data['branch'] ?? $old['branch'],
             ]);
             return;
         }
@@ -71,24 +82,17 @@ class ProfileController extends BaseController
     public function updatePassword(array $params = []): void
     {
         SecurityHelper::requireAuth();
-
-        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            ResponseHelper::abort(419, 'Invalid CSRF token.');
-        }
+        $old = [
+            'password' => '',
+            'password_confirmation' => '',
+        ];
+        $this->enforceCsrfOrRedirect('profile', 'profile-password', $old);
 
         $currentUser = SecurityHelper::currentUser();
         $result = $this->authService->changePassword((int) ($currentUser['id'] ?? 0), $_POST);
 
         if (!$result['success']) {
-            $user = $this->users->findById((int) ($currentUser['id'] ?? 0));
-            $this->view('profile/account', [
-                'title' => 'My Account',
-                'user' => $user,
-                'errors' => [],
-                'profileErrors' => [],
-                'passwordErrors' => $result['errors'],
-                'regions' => RegionBranchHelper::regions(),
-            ]);
+            $this->redirectWithValidation('profile', 'profile-password', $result['errors'], $old);
             return;
         }
 

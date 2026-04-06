@@ -2,28 +2,26 @@
 
 namespace App\Services;
 
-use App\Models\Notice;
+use App\Models\ParentProcurement;
 use App\Models\User;
 
 class DashboardQueryService extends BaseService
 {
     public function __construct(
-        private readonly ?Notice $notices = null,
+        private readonly ?ParentProcurement $parents = null,
         private readonly ?User $users = null,
-        private readonly ?DateStatusService $statusService = null
+        private readonly ?ProcurementPostingService $posting = null
     ) {
     }
 
     public function overview(array $currentUser): array
     {
-        $noticeModel = $this->notices ?? new Notice();
-        $statusService = $this->statusService ?? new DateStatusService($noticeModel);
+        $parentModel = $this->parents ?? new ParentProcurement();
+        $posting = $this->posting ?? new ProcurementPostingService($parentModel);
         $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         $records = $isAdmin
-            ? $noticeModel->findAllBids()
-            : $noticeModel->findByUploader((int) ($currentUser['id'] ?? 0));
-
-        $records = $statusService->synchronizeCollection($records);
+            ? $parentModel->findAll()
+            : $parentModel->findByCreator((int) ($currentUser['id'] ?? 0));
 
         $counts = [
             'total_bids' => 0,
@@ -33,13 +31,10 @@ class DashboardQueryService extends BaseService
             'archived' => 0,
         ];
 
-        foreach ($records as $notice) {
-            if (($notice['type'] ?? null) !== 'bid') {
-                continue;
-            }
-
+        foreach ($records as $record) {
+            $record = $posting->refreshParentState($record);
             $counts['total_bids']++;
-            $status = (string) ($notice['status'] ?? '');
+            $status = (string) ($record['status'] ?? '');
             if (array_key_exists($status, $counts)) {
                 $counts[$status]++;
             }

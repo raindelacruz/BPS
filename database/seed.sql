@@ -523,3 +523,173 @@ INSERT INTO `email_change_requests` (
         NOW(),
         DATE_SUB(DATE_ADD(NOW(), INTERVAL 1 DAY), INTERVAL 12 HOUR)
     );
+
+INSERT INTO `parent_procurement` (
+    `reference_number`,
+    `procurement_title`,
+    `abc`,
+    `mode_of_procurement`,
+    `posting_date`,
+    `bid_submission_deadline`,
+    `description`,
+    `status`,
+    `current_stage`,
+    `is_archived`,
+    `archived_at`,
+    `region`,
+    `branch`,
+    `created_by`,
+    `updated_by`,
+    `created_at`,
+    `updated_at`
+)
+SELECT
+    n.`reference_code`,
+    n.`title`,
+    0.00,
+    n.`procurement_type`,
+    n.`start_date`,
+    n.`end_date`,
+    n.`description`,
+    n.`status`,
+    CASE
+        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN 'notice_to_proceed'
+        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'contract') THEN 'contract'
+        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'award') THEN 'award'
+        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') THEN 'resolution'
+        ELSE 'bid_notice'
+    END,
+    n.`is_archived`,
+    n.`archived_at`,
+    n.`region`,
+    n.`branch`,
+    n.`uploaded_by`,
+    n.`uploaded_by`,
+    n.`upload_date`,
+    n.`upload_date`
+FROM `notices` n
+WHERE n.`type` = 'bid';
+
+INSERT INTO `bid_notices` (
+    `parent_procurement_id`,
+    `title`,
+    `description`,
+    `file_path`,
+    `document_type`,
+    `sequence_stage`,
+    `posted_at`,
+    `is_locked`,
+    `locked_at`,
+    `lock_reason`,
+    `is_reopened`,
+    `reopened_at`,
+    `reopened_by`,
+    `created_by`,
+    `updated_by`,
+    `created_at`,
+    `updated_at`
+)
+SELECT
+    p.`id`,
+    n.`title`,
+    n.`description`,
+    n.`file_path`,
+    'bid_notice',
+    1,
+    n.`start_date`,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('resolution', 'award', 'contract', 'proceed')) THEN 1 ELSE 0 END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('resolution', 'award', 'contract', 'proceed')) THEN NOW() ELSE NULL END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('resolution', 'award', 'contract', 'proceed')) THEN 'Locked by seeded downstream posting.' ELSE NULL END,
+    0,
+    NULL,
+    NULL,
+    n.`uploaded_by`,
+    n.`uploaded_by`,
+    n.`upload_date`,
+    n.`upload_date`
+FROM `notices` n
+INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
+WHERE n.`type` = 'bid';
+
+INSERT INTO `supplemental_bid_bulletins` (
+    `parent_procurement_id`,
+    `title`,
+    `description`,
+    `file_path`,
+    `document_type`,
+    `sequence_stage`,
+    `posted_at`,
+    `is_locked`,
+    `locked_at`,
+    `lock_reason`,
+    `is_reopened`,
+    `reopened_at`,
+    `reopened_by`,
+    `created_by`,
+    `updated_by`,
+    `created_at`,
+    `updated_at`
+)
+SELECT
+    p.`id`,
+    n.`title`,
+    n.`description`,
+    n.`file_path`,
+    'supplemental_bid_bulletin',
+    2,
+    n.`start_date`,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') OR n.`end_date` < NOW() THEN 1 ELSE 0 END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') OR n.`end_date` < NOW() THEN NOW() ELSE NULL END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') THEN 'Locked after seeded resolution posting.' WHEN n.`end_date` < NOW() THEN 'Locked after bid submission deadline.' ELSE NULL END,
+    0,
+    NULL,
+    NULL,
+    n.`uploaded_by`,
+    n.`uploaded_by`,
+    n.`upload_date`,
+    n.`upload_date`
+FROM `notices` n
+INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
+WHERE n.`type` = 'sbb';
+
+INSERT INTO `resolutions` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
+SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'resolution', 3, n.`start_date`,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('award', 'contract', 'proceed')) THEN 1 ELSE 0 END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('award', 'contract', 'proceed')) THEN NOW() ELSE NULL END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('award', 'contract', 'proceed')) THEN 'Locked by seeded downstream posting.' ELSE NULL END,
+    0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
+FROM `notices` n
+INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
+WHERE n.`type` = 'resolution';
+
+INSERT INTO `awards` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
+SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'award', 4, n.`start_date`,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('contract', 'proceed')) THEN 1 ELSE 0 END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('contract', 'proceed')) THEN NOW() ELSE NULL END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('contract', 'proceed')) THEN 'Locked by seeded downstream posting.' ELSE NULL END,
+    0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
+FROM `notices` n
+INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
+WHERE n.`type` = 'award';
+
+INSERT INTO `contracts` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
+SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'contract', 5, n.`start_date`,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN 1 ELSE 0 END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN NOW() ELSE NULL END,
+    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN 'Locked by seeded notice to proceed.' ELSE NULL END,
+    0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
+FROM `notices` n
+INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
+WHERE n.`type` = 'contract';
+
+INSERT INTO `notices_to_proceed` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
+SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'notice_to_proceed', 6, n.`start_date`,
+    0, NULL, NULL, 0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
+FROM `notices` n
+INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
+WHERE n.`type` = 'proceed';
+
+INSERT INTO `procurement_activity_logs` (`parent_procurement_id`, `document_type`, `document_id`, `sequence_stage`, `action_type`, `acted_by`, `action_note`, `created_at`)
+SELECT p.`id`, 'bid_notice', b.`id`, 1, 'create', b.`created_by`, 'Seeded bid notice activity.', b.`created_at`
+FROM `bid_notices` b
+INNER JOIN `parent_procurement` p ON p.`id` = b.`parent_procurement_id`;

@@ -27,4 +27,9 @@ class ViewHelper
     {
         return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     }
+
+    public static function old(array $old, string $field, mixed $default = ''): mixed
+    {
+        return $old[$field] ?? $default;
+    }
 }

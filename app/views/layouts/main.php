@@ -46,55 +46,55 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         .shell {
             max-width: 1160px;
             margin: 0 auto;
-            padding: 18px 18px 28px;
+            padding: 12px 12px 18px;
         }
         .app-shell {
             display: grid;
-            gap: 14px;
+            gap: 10px;
         }
         .card {
             background: var(--panel);
             border: 1px solid rgba(217, 226, 236, 0.95);
-            border-radius: 18px;
+            border-radius: 14px;
             box-shadow: var(--shadow);
-            padding: 18px;
+            padding: 14px;
         }
         .topbar {
             display: flex;
             flex-wrap: nowrap;
             justify-content: space-between;
-            gap: 12px;
+            gap: 10px;
             align-items: center;
-            padding: 14px 16px;
+            padding: 10px 12px;
             background: rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(217, 226, 236, 0.95);
-            border-radius: 18px;
+            border-radius: 14px;
             box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
         }
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         .brand h1,
         .brand p {
             margin: 0;
         }
         .brand h1 {
-            font-size: 1.2rem;
+            font-size: 1.05rem;
             line-height: 1.1;
         }
         .brand p {
             color: var(--muted);
-            font-size: 0.9rem;
+            font-size: 0.82rem;
         }
         .brand img {
-            width: 56px;
-            height: 56px;
+            width: 46px;
+            height: 46px;
             object-fit: contain;
-            border-radius: 14px;
+            border-radius: 12px;
             background: #fff;
-            padding: 6px;
+            padding: 4px;
             border: 1px solid rgba(217, 226, 236, 0.95);
         }
         .nav {
@@ -114,12 +114,12 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         .nav a {
             display: inline-flex;
             align-items: center;
-            min-height: 38px;
-            padding: 0 14px;
-            border-radius: 10px;
+            min-height: 34px;
+            padding: 0 12px;
+            border-radius: 9px;
             color: var(--muted);
             text-decoration: none;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 700;
             transition: background-color 0.2s ease, color 0.2s ease;
         }
@@ -131,13 +131,13 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             display: flex;
             flex-wrap: nowrap;
             align-items: center;
-            gap: 8px 12px;
-            padding: 8px 12px;
+            gap: 6px 10px;
+            padding: 6px 10px;
             border: 1px solid var(--line);
-            border-radius: 12px;
+            border-radius: 10px;
             background: var(--panel-soft);
             color: var(--muted);
-            font-size: 0.9rem;
+            font-size: 0.84rem;
             white-space: nowrap;
         }
         .session-meta strong {
@@ -148,13 +148,13 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             gap: 0;
         }
         .session-form button {
-            min-height: 38px;
-            padding: 0 14px;
-            border-radius: 10px;
+            min-height: 34px;
+            padding: 0 12px;
+            border-radius: 9px;
             border: 1px solid var(--line);
             background: #fff;
             color: var(--muted);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 700;
             box-shadow: none;
         }
@@ -168,8 +168,8 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             flex-wrap: wrap;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 10px;
-            margin-bottom: 14px;
+            gap: 8px;
+            margin-bottom: 10px;
         }
         .page-head h1,
         .page-head h2,
@@ -183,33 +183,33 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         }
         .flash {
             margin: 0;
-            padding: 11px 13px;
-            border-radius: 12px;
+            padding: 9px 11px;
+            border-radius: 10px;
             border: 1px solid #bfdbfe;
             background: #eff6ff;
             color: #1e3a8a;
         }
         .flash + .flash {
-            margin-top: 10px;
+            margin-top: 8px;
         }
         .section-stack {
             display: grid;
-            gap: 14px;
+            gap: 10px;
         }
         .stack-sm {
             display: grid;
-            gap: 10px;
+            gap: 8px;
         }
         .panel {
             background: var(--panel-soft);
             border: 1px solid var(--line);
-            border-radius: 14px;
-            padding: 14px;
+            border-radius: 12px;
+            padding: 10px 12px;
         }
         .form-grid,
         form {
             display: grid;
-            gap: 12px;
+            gap: 10px;
         }
         .form-grid.two-col {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -223,8 +223,8 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         input, button, select, textarea {
             font: inherit;
             width: 100%;
-            padding: 10px 12px;
-            border-radius: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
             border: 1px solid #cbd5e1;
             background: #fff;
             color: var(--text);
@@ -252,7 +252,7 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         .action-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
         }
         a {
@@ -268,14 +268,15 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 38px;
-            padding: 0 14px;
-            border-radius: 10px;
+            min-height: 32px;
+            padding: 0 12px;
+            border-radius: 8px;
             border: 1px solid var(--line);
             background: #fff;
             color: #0f5f8c;
             text-decoration: none;
             font-weight: 700;
+            font-size: 0.9rem;
         }
         .btn-link:hover,
         .chip-link:hover {
@@ -283,9 +284,37 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             background: #f8fafc;
         }
         .chip-link {
-            min-height: 34px;
-            padding: 0 12px;
-            font-size: 0.9rem;
+            min-height: 30px;
+            padding: 0 10px;
+            font-size: 0.84rem;
+        }
+        .chip-link.is-disabled,
+        .btn-link.is-disabled {
+            pointer-events: none;
+            opacity: 0.55;
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        .helper-text {
+            margin: 2px 0 0;
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+        .field-error {
+            margin: 4px 0 0;
+            color: var(--danger);
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .input-error,
+        .input-error:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+        }
+        .action-stack {
+            display: grid;
+            gap: 3px;
+            align-content: start;
         }
         table {
             width: 100%;
@@ -295,12 +324,12 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         }
         th, td {
             text-align: left;
-            padding: 11px 12px;
+            padding: 8px 10px;
             border-bottom: 1px solid #e2e8f0;
             vertical-align: top;
         }
         th {
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             text-transform: uppercase;
             letter-spacing: 0.04em;
             color: #64748b;
@@ -309,14 +338,14 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         .table-wrap {
             overflow-x: auto;
             border: 1px solid var(--line);
-            border-radius: 14px;
+            border-radius: 12px;
             background: #fff;
         }
         .detail-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-            margin: 12px 0;
+            gap: 8px;
+            margin: 8px 0;
         }
         .profile-summary-grid {
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -326,8 +355,8 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         .detail-grid div {
             background: var(--panel-soft);
             border: 1px solid var(--line);
-            border-radius: 14px;
-            padding: 12px;
+            border-radius: 12px;
+            padding: 10px;
         }
         .profile-summary-grid div {
             min-height: 92px;
@@ -338,8 +367,8 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         }
         .card-section {
             border-top: 1px solid var(--line);
-            padding-top: 16px;
-            margin-top: 16px;
+            padding-top: 12px;
+            margin-top: 12px;
         }
         @media (max-width: 1100px) {
             .profile-summary-grid {
@@ -353,31 +382,31 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         }
         dt {
             font-weight: 700;
-            margin-bottom: 4px;
-            font-size: 0.82rem;
+            margin-bottom: 3px;
+            font-size: 0.74rem;
             text-transform: uppercase;
             letter-spacing: 0.03em;
             color: #64748b;
         }
         dd {
             margin: 0;
-            font-size: 1rem;
+            font-size: 0.94rem;
             font-weight: 600;
         }
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px;
+            gap: 8px;
         }
         .metric-card {
-            padding: 14px;
-            border-radius: 14px;
+            padding: 12px;
+            border-radius: 12px;
             background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
             border: 1px solid var(--line);
         }
         .metric-card strong {
             display: block;
-            font-size: 1.45rem;
+            font-size: 1.25rem;
             line-height: 1.1;
             margin-top: 4px;
         }
@@ -385,11 +414,11 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 3px 10px;
+            padding: 2px 8px;
             border-radius: 999px;
             background: #e2e8f0;
             color: #334155;
-            font-size: 0.8rem;
+            font-size: 0.74rem;
             font-weight: 700;
             text-transform: capitalize;
             white-space: nowrap;
@@ -429,15 +458,15 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
         }
         .inline-form {
             display: inline-grid;
-            gap: 8px;
+            gap: 6px;
         }
         @media (max-width: 760px) {
             .shell {
-                padding: 14px 12px 22px;
+                padding: 10px 10px 16px;
             }
             .topbar,
             .card {
-                padding: 14px;
+                padding: 12px;
             }
             .topbar {
                 flex-wrap: wrap;

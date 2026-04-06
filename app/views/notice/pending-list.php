@@ -2,13 +2,13 @@
 
 use App\Helpers\ProcurementTypeHelper;
 use App\Helpers\ResponseHelper;
-use App\Helpers\SecurityHelper;
 use App\Helpers\ViewHelper;
+use App\Models\ProcurementDocument;
 ?>
 <div class="page-head">
     <div>
-        <h1>Bid Notices</h1>
-        <p>Manage your bid notices. Pending notices remain editable; active and expired records are view-only in this phase.</p>
+        <h1>Procurement Postings</h1>
+        <p>Each project uses one procurement record, then all signed documents are posted in strict legal sequence under that record.</p>
     </div>
 </div>
 
@@ -16,142 +16,126 @@ use App\Helpers\ViewHelper;
     <div class="page-head">
         <div>
             <h2>Actions</h2>
-            <p>Create a root bid notice or add follow-up workflow records.</p>
+            <p>Create the root record first, then add downstream posting documents as prerequisites become available.</p>
         </div>
     </div>
     <div class="action-row">
-        <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/create')); ?>">Create bid notice</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=sbb')); ?>">Create SBB</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=resolution')); ?>">Create Resolution</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=award')); ?>">Create Award</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=contract')); ?>">Create Contract</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=proceed')); ?>">Create Proceed</a>
+        <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/create')); ?>">Create procurement posting</a>
+        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_SBB)); ?>">Add Supplemental/Bid Bulletin</a>
+        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_RESOLUTION)); ?>">Add Resolution</a>
+        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_AWARD)); ?>">Add Award</a>
+        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_CONTRACT)); ?>">Add Contract</a>
+        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_NOTICE_TO_PROCEED)); ?>">Add Notice to Proceed</a>
     </div>
 </div>
 
 <?php if (empty($notices)): ?>
-    <p>No bid notices found yet.</p>
+    <p>No procurement postings found yet.</p>
 <?php else: ?>
     <div class="card-section stack-sm">
-    <div class="page-head">
-        <div>
-            <h2>Pending</h2>
-            <p>Records still open for edits before activation.</p>
+        <div class="page-head">
+            <div>
+                <h2>Pending</h2>
+                <p>Procurement postings whose Bid Notice is scheduled but not yet active.</p>
+            </div>
         </div>
-    </div>
-    <?php if (empty($pendingNotices)): ?>
-        <p>No pending bid notices.</p>
-    <?php else: ?>
-        <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Reference</th>
-                    <th>Status</th>
-                    <th>Dates</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($pendingNotices as $notice): ?>
-                    <tr>
-                        <td><strong><?= ViewHelper::escape($notice['title']); ?></strong></td>
-                        <td><code><?= ViewHelper::escape($notice['reference_code']); ?></code></td>
-                        <td><span class="status-badge pending"><?= ViewHelper::escape($notice['status']); ?></span></td>
-                        <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $notice['start_date']))); ?> to <?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $notice['end_date']))); ?></td>
-                        <td>
-                            <div class="action-row">
-                                <a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a>
-                                <a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'] . '/edit')); ?>">Edit</a>
-                            </div>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-        </div>
-    <?php endif; ?>
+        <?php if (empty($pendingNotices)): ?>
+            <p>No pending procurement postings.</p>
+        <?php else: ?>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Reference</th>
+                            <th>Posting Date</th>
+                            <th>Deadline</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($pendingNotices as $notice): ?>
+                            <tr>
+                                <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
+                                <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
+                                <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $notice['posting_date']))); ?></td>
+                                <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $notice['bid_submission_deadline']))); ?></td>
+                                <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 
     <div class="card-section stack-sm">
-    <div class="page-head">
-        <div>
-            <h2>All Bid Notices</h2>
-            <p>Full list across statuses, uploader ownership, and workflow types.</p>
+        <div class="page-head">
+            <div>
+                <h2>All Procurement Records</h2>
+                <p>Workflow stage, submission deadline, and mode of procurement are tracked on the root record.</p>
+            </div>
         </div>
-    </div>
-    <div class="table-wrap">
-    <table>
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Reference</th>
-                <th>Status</th>
-                <th>Region</th>
-                <th>Branch</th>
-                <th>Procurement</th>
-                <th>Uploader</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($notices as $notice): ?>
-                <tr>
-                    <td><strong><?= ViewHelper::escape($notice['title']); ?></strong></td>
-                    <td><code><?= ViewHelper::escape($notice['reference_code']); ?></code></td>
-                    <td><span class="status-badge <?= ViewHelper::escape((string) ($notice['status'] ?? '')); ?>"><?= ViewHelper::escape($notice['status']); ?></span></td>
-                    <td><?= ViewHelper::escape($notice['region']); ?></td>
-                    <td><?= ViewHelper::escape($notice['branch'] ?? ''); ?></td>
-                    <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $notice['procurement_type'])); ?></td>
-                    <td><?= ViewHelper::escape(trim(($notice['firstname'] ?? '') . ' ' . ($notice['lastname'] ?? '')) ?: ($notice['uploader_username'] ?? '')); ?></td>
-                    <td>
-                        <div class="action-row">
-                            <a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a>
-                            <?php if (($notice['status'] ?? null) === 'pending' && ((int) $notice['uploaded_by'] === (int) ($currentUser['id'] ?? 0) || ($currentUser['role'] ?? null) === 'admin')): ?>
-                                <a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'] . '/edit')); ?>">Edit</a>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-    </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Reference</th>
+                        <th>Status</th>
+                        <th>Current Stage</th>
+                        <th>Region</th>
+                        <th>Branch</th>
+                        <th>Mode</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($notices as $notice): ?>
+                        <tr>
+                            <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
+                            <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
+                            <td><span class="status-badge <?= ViewHelper::escape((string) ($notice['status'] ?? '')); ?>"><?= ViewHelper::escape($notice['status']); ?></span></td>
+                            <td><?= ViewHelper::escape(ucwords(str_replace('_', ' ', (string) ($notice['current_stage'] ?? 'draft')))); ?></td>
+                            <td><?= ViewHelper::escape($notice['region']); ?></td>
+                            <td><?= ViewHelper::escape($notice['branch'] ?? ''); ?></td>
+                            <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $notice['mode_of_procurement'])); ?></td>
+                            <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="card-section stack-sm">
-    <div class="page-head">
-        <div>
-            <h2>Archived</h2>
-            <p>Workflow sets kept for reference after archival.</p>
-        </div>
-    </div>
-    <?php if (empty($archivedNotices)): ?>
-        <p>No archived bid notices.</p>
-    <?php else: ?>
-        <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Reference</th>
-                    <th>Archived At</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($archivedNotices as $notice): ?>
-                    <tr>
-                        <td><strong><?= ViewHelper::escape($notice['title']); ?></strong></td>
-                        <td><code><?= ViewHelper::escape($notice['reference_code']); ?></code></td>
-                        <td><?= ViewHelper::escape($notice['archived_at'] ? date('Y-m-d H:i', strtotime((string) $notice['archived_at'])) : ''); ?></td>
-                        <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+    <?php if (!empty($archivedNotices)): ?>
+        <div class="card-section stack-sm">
+            <div class="page-head">
+                <div>
+                    <h2>Archived</h2>
+                    <p>Retained only for compatibility. New postings in this module do not use archive actions.</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Reference</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($archivedNotices as $notice): ?>
+                            <tr>
+                                <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
+                                <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
+                                <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     <?php endif; ?>
-    </div>
 <?php endif; ?>

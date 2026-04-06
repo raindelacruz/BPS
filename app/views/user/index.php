@@ -2,6 +2,7 @@
 
 use App\Helpers\ResponseHelper;
 use App\Helpers\SecurityHelper;
+use App\Helpers\ValidationHelper;
 use App\Helpers\ViewHelper;
 ?>
 <div class="page-head">
@@ -27,6 +28,11 @@ use App\Helpers\ViewHelper;
             </thead>
             <tbody>
                 <?php foreach ($users as $user): ?>
+                    <?php
+                    $isEditing = (int) ($editingUserId ?? 0) === (int) $user['id'];
+                    $rowOld = $isEditing ? ($editState['old'] ?? []) : [];
+                    $rowErrors = $isEditing ? ($editState['errors'] ?? []) : [];
+                    ?>
                     <tr>
                         <td>
                             <strong><?= ViewHelper::escape(trim($user['firstname'] . ' ' . ($user['middle_initial'] ? $user['middle_initial'] . '. ' : '') . $user['lastname'])); ?></strong>
@@ -42,7 +48,7 @@ use App\Helpers\ViewHelper;
                         </td>
                         <td>
                             <div class="stack-sm">
-                                <details>
+                                <details <?= $isEditing ? 'open' : ''; ?>>
                                     <summary><a href="#" onclick="return false;">Edit</a></summary>
                                     <div class="panel" style="margin-top: 10px; min-width: 300px;">
                                         <form method="POST" action="<?= ViewHelper::escape(ResponseHelper::url('users/' . (int) $user['id'] . '/update')); ?>" class="form-grid">
@@ -50,47 +56,70 @@ use App\Helpers\ViewHelper;
 
                                             <div>
                                                 <label for="username-<?= (int) $user['id']; ?>">Username</label>
-                                                <input id="username-<?= (int) $user['id']; ?>" name="username" type="text" value="<?= ViewHelper::escape($user['username']); ?>" required>
+                                                <input id="username-<?= (int) $user['id']; ?>" name="username" type="text" value="<?= ViewHelper::escape($rowOld['username'] ?? $user['username']); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($rowErrors, 'username')); ?>" required>
+                                                <?php if (ValidationHelper::first($rowErrors, 'username')): ?>
+                                                    <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, 'username')); ?></div>
+                                                <?php endif; ?>
                                             </div>
 
                                             <div>
                                                 <label for="firstname-<?= (int) $user['id']; ?>">First name</label>
-                                                <input id="firstname-<?= (int) $user['id']; ?>" name="firstname" type="text" value="<?= ViewHelper::escape($user['firstname']); ?>" required>
+                                                <input id="firstname-<?= (int) $user['id']; ?>" name="firstname" type="text" value="<?= ViewHelper::escape($rowOld['firstname'] ?? $user['firstname']); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($rowErrors, 'firstname')); ?>" required>
+                                                <?php if (ValidationHelper::first($rowErrors, 'firstname')): ?>
+                                                    <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, 'firstname')); ?></div>
+                                                <?php endif; ?>
                                             </div>
 
                                             <div>
                                                 <label for="middle-<?= (int) $user['id']; ?>">Middle initial</label>
-                                                <input id="middle-<?= (int) $user['id']; ?>" name="middle_initial" type="text" maxlength="1" value="<?= ViewHelper::escape($user['middle_initial'] ?? ''); ?>">
+                                                <input id="middle-<?= (int) $user['id']; ?>" name="middle_initial" type="text" maxlength="1" value="<?= ViewHelper::escape($rowOld['middle_initial'] ?? ($user['middle_initial'] ?? '')); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($rowErrors, 'middle_initial')); ?>">
+                                                <?php if (ValidationHelper::first($rowErrors, 'middle_initial')): ?>
+                                                    <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, 'middle_initial')); ?></div>
+                                                <?php endif; ?>
                                             </div>
 
                                             <div>
                                                 <label for="lastname-<?= (int) $user['id']; ?>">Last name</label>
-                                                <input id="lastname-<?= (int) $user['id']; ?>" name="lastname" type="text" value="<?= ViewHelper::escape($user['lastname']); ?>" required>
+                                                <input id="lastname-<?= (int) $user['id']; ?>" name="lastname" type="text" value="<?= ViewHelper::escape($rowOld['lastname'] ?? $user['lastname']); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($rowErrors, 'lastname')); ?>" required>
+                                                <?php if (ValidationHelper::first($rowErrors, 'lastname')): ?>
+                                                    <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, 'lastname')); ?></div>
+                                                <?php endif; ?>
                                             </div>
 
                                             <?php
                                             $regionFieldId = 'region-' . (int) $user['id'];
                                             $branchFieldId = 'branch-' . (int) $user['id'];
-                                            $selectedRegion = $user['region'] ?? '';
-                                            $selectedBranch = $user['branch'] ?? '';
+                                            $selectedRegion = $rowOld['region'] ?? ($user['region'] ?? '');
+                                            $selectedBranch = $rowOld['branch'] ?? ($user['branch'] ?? '');
+                                            $errors = $rowErrors;
                                             require __DIR__ . '/../partials/region_branch_fields.php';
                                             ?>
 
                                             <div>
                                                 <label for="email-<?= (int) $user['id']; ?>">Email</label>
-                                                <input id="email-<?= (int) $user['id']; ?>" name="email" type="email" value="<?= ViewHelper::escape($user['email']); ?>" required>
+                                                <input id="email-<?= (int) $user['id']; ?>" name="email" type="email" value="<?= ViewHelper::escape($rowOld['email'] ?? $user['email']); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($rowErrors, 'email')); ?>" required>
+                                                <?php if (ValidationHelper::first($rowErrors, 'email')): ?>
+                                                    <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, 'email')); ?></div>
+                                                <?php endif; ?>
                                             </div>
 
                                             <div>
                                                 <label for="role-<?= (int) $user['id']; ?>">Role</label>
-                                                <select id="role-<?= (int) $user['id']; ?>" name="role" required>
+                                                <select id="role-<?= (int) $user['id']; ?>" name="role" class="<?= ViewHelper::escape(ValidationHelper::inputClass($rowErrors, 'role')); ?>" required>
                                                     <?php foreach ($roles as $role): ?>
-                                                        <option value="<?= ViewHelper::escape($role); ?>" <?= $user['role'] === $role ? 'selected' : ''; ?>>
+                                                        <option value="<?= ViewHelper::escape($role); ?>" <?= ($rowOld['role'] ?? $user['role']) === $role ? 'selected' : ''; ?>>
                                                             <?= ViewHelper::escape($role); ?>
                                                         </option>
                                                     <?php endforeach; ?>
                                                 </select>
+                                                <?php if (ValidationHelper::first($rowErrors, 'role')): ?>
+                                                    <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, 'role')); ?></div>
+                                                <?php endif; ?>
                                             </div>
+
+                                            <?php if (ValidationHelper::first($rowErrors, '_global')): ?>
+                                                <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($rowErrors, '_global')); ?></div>
+                                            <?php endif; ?>
 
                                             <div class="btn-row">
                                                 <button type="submit">Save</button>

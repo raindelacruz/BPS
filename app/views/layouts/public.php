@@ -132,6 +132,17 @@ $pageTitle = isset($title) ? ViewHelper::escape($title) . ' | ' . ViewHelper::es
             color: #fff;
             font-weight: 700;
         }
+        .field-error {
+            margin: 4px 0 0;
+            color: #b91c1c;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .input-error,
+        .input-error:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+        }
         a {
             color: #0f5f8c;
             text-decoration: none;

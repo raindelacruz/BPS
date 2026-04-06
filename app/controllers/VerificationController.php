@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Helpers\ValidationHelper;
 use App\Helpers\ResponseHelper;
 use App\Helpers\SecurityHelper;
 use App\Helpers\SessionHelper;
@@ -23,27 +24,27 @@ class VerificationController extends BaseController
     public function showVerify(array $params = []): void
     {
         SecurityHelper::requireGuest();
+        $state = $this->formState('verify', [
+            'email' => $_GET['email'] ?? '',
+            'code' => '',
+        ]);
 
         $this->view('auth/verify', [
             'title' => 'Verify Account',
-            'errors' => [],
-            'old' => [
-                'email' => $_GET['email'] ?? '',
-                'code' => '',
-            ],
+            'errors' => $state['errors'],
+            'old' => $state['old'],
         ]);
     }
 
     public function verify(array $params = []): void
     {
         SecurityHelper::requireGuest();
+        $old = [
+            'email' => trim((string) ($_POST['email'] ?? '')),
+            'code' => trim((string) ($_POST['code'] ?? '')),
+        ];
 
-        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            $this->json([
-                'success' => false,
-                'message' => 'Invalid CSRF token.',
-            ], 419);
-        }
+        $this->enforceCsrfOrRedirect('verify', 'verify', $old);
 
         $result = $this->authService->verifyRegistration($_POST);
 
@@ -51,14 +52,7 @@ class VerificationController extends BaseController
             $this->redirect('login');
         }
 
-        $this->view('auth/verify', [
-            'title' => 'Verify Account',
-            'errors' => $result['errors'],
-            'old' => [
-                'email' => $_POST['email'] ?? '',
-                'code' => $_POST['code'] ?? '',
-            ],
-        ]);
+        $this->redirectWithValidation('verify', 'verify', $result['errors'], $old);
     }
 
     public function verifyEmailChange(array $params = []): void
@@ -66,7 +60,8 @@ class VerificationController extends BaseController
         $token = trim((string) ($_GET['token'] ?? ''));
 
         if ($token === '') {
-            ResponseHelper::abort(400, 'Verification token is required.');
+            SessionHelper::flash('error', 'Verification token is required.');
+            ResponseHelper::redirect('login');
         }
 
         $result = $this->userManagement->verifyEmailChangeToken($token);
@@ -76,6 +71,7 @@ class VerificationController extends BaseController
             ResponseHelper::redirect('login');
         }
 
-        ResponseHelper::abort(400, implode(' ', $result['errors']));
+        SessionHelper::flash('error', implode(' ', ValidationHelper::all($result['errors'])));
+        ResponseHelper::redirect('login');
     }
 }

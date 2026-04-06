@@ -3,15 +3,15 @@
 namespace App\Controllers;
 
 use App\Helpers\SecurityHelper;
-use App\Services\PrerequisiteService;
+use App\Services\ProcurementPostingService;
 
 class WorkflowValidationController extends BaseController
 {
-    private PrerequisiteService $prerequisites;
+    private ProcurementPostingService $posting;
 
     public function __construct()
     {
-        $this->prerequisites = new PrerequisiteService();
+        $this->posting = new ProcurementPostingService();
     }
 
     public function eligibleBids(array $params = []): void
@@ -19,15 +19,15 @@ class WorkflowValidationController extends BaseController
         SecurityHelper::requireAuth();
 
         $type = strtolower(trim((string) ($_GET['type'] ?? '')));
-        $records = $this->prerequisites->eligibleParentBids($type);
+        $records = $this->posting->eligibleParents($type, SecurityHelper::currentUser() ?? []);
 
         $payload = array_map(static function (array $notice): array {
             return [
                 'id' => (int) $notice['id'],
-                'title' => $notice['title'],
-                'reference_code' => $notice['reference_code'],
+                'title' => $notice['procurement_title'],
+                'reference_code' => $notice['reference_number'],
                 'region' => $notice['region'],
-                'procurement_type' => $notice['procurement_type'],
+                'procurement_type' => $notice['mode_of_procurement'],
                 'status' => $notice['status'],
             ];
         }, $records);

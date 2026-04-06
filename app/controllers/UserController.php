@@ -2,10 +2,11 @@
 
 namespace App\Controllers;
 
+use App\Helpers\FormStateHelper;
 use App\Helpers\RegionBranchHelper;
-use App\Helpers\ResponseHelper;
 use App\Helpers\SecurityHelper;
 use App\Helpers\SessionHelper;
+use App\Helpers\ValidationHelper;
 use App\Services\AuthService;
 use App\Services\UserManagementService;
 
@@ -27,12 +28,19 @@ class UserController extends BaseController
         SecurityHelper::requireRole('admin');
 
         $currentUser = SecurityHelper::currentUser();
+        $editingUserId = (int) ($_GET['edit'] ?? 0);
+        $editState = $editingUserId > 0
+            ? FormStateHelper::consume('user-edit-' . $editingUserId)
+            : ['errors' => [], 'old' => []];
+
         $this->view('user/index', [
             'title' => 'User Management',
             'users' => $this->userManagement->listUsers(),
             'currentUser' => $currentUser,
             'roles' => ['author', 'admin'],
             'regions' => RegionBranchHelper::regions(),
+            'editingUserId' => $editingUserId,
+            'editState' => $editState,
         ]);
     }
 
@@ -40,14 +48,24 @@ class UserController extends BaseController
     {
         SecurityHelper::requireAuth();
         SecurityHelper::requireRole('admin');
-        $this->enforceCsrf();
-
         $targetId = (int) ($params['id'] ?? 0);
+        $old = [
+            'username' => trim((string) ($_POST['username'] ?? '')),
+            'firstname' => trim((string) ($_POST['firstname'] ?? '')),
+            'middle_initial' => trim((string) ($_POST['middle_initial'] ?? '')),
+            'lastname' => trim((string) ($_POST['lastname'] ?? '')),
+            'region' => trim((string) ($_POST['region'] ?? '')),
+            'branch' => trim((string) ($_POST['branch'] ?? '')),
+            'email' => trim((string) ($_POST['email'] ?? '')),
+            'role' => trim((string) ($_POST['role'] ?? '')),
+        ];
+        $redirectPath = 'users?edit=' . $targetId;
+        $this->enforceCsrfOrRedirect($redirectPath, 'user-edit-' . $targetId, $old);
+
         $result = $this->userManagement->updateUser($targetId, $_POST, SecurityHelper::currentUser() ?? []);
 
         if (!$result['success']) {
-            SessionHelper::flash('error', implode(' ', $result['errors']));
-            $this->redirect('users');
+            $this->redirectWithValidation($redirectPath, 'user-edit-' . $targetId, $result['errors'], $old);
         }
 
         if ((int) (SecurityHelper::currentUser()['id'] ?? 0) === $targetId) {
@@ -62,12 +80,17 @@ class UserController extends BaseController
     {
         SecurityHelper::requireAuth();
         SecurityHelper::requireRole('admin');
-        $this->enforceCsrf();
+        $targetId = (int) ($params['id'] ?? 0);
 
-        $result = $this->userManagement->toggleActiveState((int) ($params['id'] ?? 0), SecurityHelper::currentUser() ?? []);
+        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
+            SessionHelper::flash('error', 'Your session expired. Please try again.');
+            $this->redirect('users');
+        }
+
+        $result = $this->userManagement->toggleActiveState($targetId, SecurityHelper::currentUser() ?? []);
 
         if (!$result['success']) {
-            SessionHelper::flash('error', implode(' ', $result['errors']));
+            SessionHelper::flash('error', implode(' ', ValidationHelper::all($result['errors'])));
         } else {
             SessionHelper::flash('success', 'User status updated successfully.');
         }
@@ -79,23 +102,21 @@ class UserController extends BaseController
     {
         SecurityHelper::requireAuth();
         SecurityHelper::requireRole('admin');
-        $this->enforceCsrf();
+        $targetId = (int) ($params['id'] ?? 0);
 
-        $result = $this->userManagement->deleteUser((int) ($params['id'] ?? 0), SecurityHelper::currentUser() ?? []);
+        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
+            SessionHelper::flash('error', 'Your session expired. Please try again.');
+            $this->redirect('users');
+        }
+
+        $result = $this->userManagement->deleteUser($targetId, SecurityHelper::currentUser() ?? []);
 
         if (!$result['success']) {
-            SessionHelper::flash('error', implode(' ', $result['errors']));
+            SessionHelper::flash('error', implode(' ', ValidationHelper::all($result['errors'])));
         } else {
             SessionHelper::flash('success', 'User deleted and notices reassigned successfully.');
         }
 
         $this->redirect('users');
-    }
-
-    private function enforceCsrf(): void
-    {
-        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            ResponseHelper::abort(419, 'Invalid CSRF token.');
-        }
     }
 }

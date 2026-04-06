@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Helpers\LogHelper;
 use App\Helpers\RegionBranchHelper;
 use App\Helpers\SessionHelper;
+use App\Helpers\ValidationHelper;
 use App\Models\User;
 use Bootstrap\Database;
 use Throwable;
@@ -60,9 +62,14 @@ class AuthService extends BaseService
                 $connection->rollBack();
             }
 
+            LogHelper::error('Registration failed.', [
+                'username' => $data['username'],
+                'email' => $data['email'],
+            ], $throwable);
+
             return [
                 'success' => false,
-                'errors' => ['Registration failed. Please try again.'],
+                'errors' => ['_global' => ['Registration failed. Please try again.']],
             ];
         }
     }
@@ -74,35 +81,35 @@ class AuthService extends BaseService
         $errors = [];
 
         if ($email === '') {
-            $errors[] = 'Email is required.';
+            ValidationHelper::addError($errors, 'email', 'Email is required.');
         }
 
         if (!preg_match('/^\d{6}$/', $code)) {
-            $errors[] = 'Verification code must be 6 digits.';
+            ValidationHelper::addError($errors, 'code', 'Verification code must be 6 digits.');
         }
 
-        if ($errors !== []) {
+        if (ValidationHelper::hasErrors($errors)) {
             return ['success' => false, 'errors' => $errors];
         }
 
         $user = $this->users->findByEmail($email);
 
         if (!$user) {
-            return ['success' => false, 'errors' => ['No account matches the provided email address.']];
+            return ['success' => false, 'errors' => ['email' => ['No account matches the provided email address.']]];
         }
 
         if ((int) $user['is_verified'] === 1) {
-            return ['success' => false, 'errors' => ['This account is already verified.']];
+            return ['success' => false, 'errors' => ['email' => ['This account is already verified.']]];
         }
 
         if (($user['verification_code'] ?? null) !== $code) {
-            return ['success' => false, 'errors' => ['Verification code is invalid.']];
+            return ['success' => false, 'errors' => ['code' => ['Verification code is invalid.']]];
         }
 
         $expiry = $user['token_expiry'] ?? null;
 
         if (!$expiry || strtotime($expiry) < time()) {
-            return ['success' => false, 'errors' => ['Verification code has expired.']];
+            return ['success' => false, 'errors' => ['code' => ['Verification code has expired.']]];
         }
 
         $this->users->markVerified((int) $user['id']);
@@ -118,25 +125,25 @@ class AuthService extends BaseService
         $errors = [];
 
         if ($username === '') {
-            $errors[] = 'Username is required.';
+            ValidationHelper::addError($errors, 'username', 'Username is required.');
         }
 
         if ($password === '') {
-            $errors[] = 'Password is required.';
+            ValidationHelper::addError($errors, 'password', 'Password is required.');
         }
 
-        if ($errors !== []) {
+        if (ValidationHelper::hasErrors($errors)) {
             return ['success' => false, 'errors' => $errors];
         }
 
         $user = $this->users->findByUsername($username);
 
         if (!$user || !password_verify($password, (string) $user['password'])) {
-            return ['success' => false, 'errors' => ['Invalid credentials.']];
+            return ['success' => false, 'errors' => ['_global' => ['Invalid credentials.']]];
         }
 
         if ((int) $user['is_active'] !== 1) {
-            return ['success' => false, 'errors' => ['Your account is not active yet. Please wait for account activation.']];
+            return ['success' => false, 'errors' => ['_global' => ['Your account is not active yet. Please wait for account activation.']]];
         }
 
         SessionHelper::put('auth_user', [
@@ -167,31 +174,31 @@ class AuthService extends BaseService
         $errors = [];
 
         if ($newPassword === '') {
-            $errors[] = 'New password is required.';
+            ValidationHelper::addError($errors, 'password', 'New password is required.');
         }
 
         if ($confirmation === '') {
-            $errors[] = 'Password confirmation is required.';
+            ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation is required.');
         }
 
         if ($newPassword !== $confirmation) {
-            $errors[] = 'Password confirmation does not match.';
+            ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation does not match.');
         }
 
         $user = $this->users->findById($userId);
 
         if (!$user) {
-            $errors[] = 'User not found.';
+            ValidationHelper::addError($errors, '_global', 'User not found.');
         }
 
-        if ($errors !== []) {
+        if (ValidationHelper::hasErrors($errors)) {
             return ['success' => false, 'errors' => $errors];
         }
 
         $updated = $this->users->updatePassword($userId, password_hash($newPassword, PASSWORD_DEFAULT));
 
         if (!$updated) {
-            return ['success' => false, 'errors' => ['Password could not be updated.']];
+            return ['success' => false, 'errors' => ['_global' => ['Password could not be updated.']]];
         }
 
         SessionHelper::flash('success', 'Password updated successfully.');
@@ -204,7 +211,7 @@ class AuthService extends BaseService
         $user = $this->users->findById($userId);
 
         if (!$user) {
-            return ['success' => false, 'errors' => ['Profile not found.']];
+            return ['success' => false, 'errors' => ['_global' => ['Profile not found.']]];
         }
 
         $data = [
@@ -217,12 +224,12 @@ class AuthService extends BaseService
 
         foreach (['email', 'region', 'branch'] as $field) {
             if ($data[$field] === '') {
-                $errors[] = ucfirst($field) . ' is required.';
+                ValidationHelper::addError($errors, $field, ucfirst($field) . ' is required.');
             }
         }
 
         if ($data['region'] !== '' && !RegionBranchHelper::isValidRegion($data['region'])) {
-            $errors[] = 'Region is invalid.';
+            ValidationHelper::addError($errors, 'region', 'Region is invalid.');
         }
 
         if (
@@ -230,18 +237,18 @@ class AuthService extends BaseService
             && $data['branch'] !== ''
             && !RegionBranchHelper::branchBelongsToRegion($data['region'], $data['branch'])
         ) {
-            $errors[] = 'Branch does not match the selected region.';
+            ValidationHelper::addError($errors, 'branch', 'Branch does not match the selected region.');
         }
 
         if (!preg_match('/^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.gov\.ph$/i', $data['email'])) {
-            $errors[] = 'Email must use a valid .gov.ph address.';
+            ValidationHelper::addError($errors, 'email', 'Email must use a valid .gov.ph address.');
         }
 
         if ($this->users->emailExistsForOther($data['email'], $userId)) {
-            $errors[] = 'Email is already in use.';
+            ValidationHelper::addError($errors, 'email', 'Email is already in use.');
         }
 
-        if ($errors !== []) {
+        if (ValidationHelper::hasErrors($errors)) {
             return [
                 'success' => false,
                 'errors' => $errors,
@@ -254,7 +261,7 @@ class AuthService extends BaseService
         if (!$updated) {
             return [
                 'success' => false,
-                'errors' => ['Profile could not be updated.'],
+                'errors' => ['_global' => ['Profile could not be updated.']],
                 'data' => array_merge($user, $data),
             ];
         }
@@ -306,12 +313,12 @@ class AuthService extends BaseService
 
         foreach (['username', 'firstname', 'lastname', 'region', 'branch', 'email', 'password', 'password_confirmation'] as $field) {
             if ($data[$field] === '') {
-                $errors[] = ucfirst(str_replace('_', ' ', $field)) . ' is required.';
+                ValidationHelper::addError($errors, $field, ucfirst(str_replace('_', ' ', $field)) . ' is required.');
             }
         }
 
         if ($data['region'] !== '' && !RegionBranchHelper::isValidRegion($data['region'])) {
-            $errors[] = 'Region is invalid.';
+            ValidationHelper::addError($errors, 'region', 'Region is invalid.');
         }
 
         if (
@@ -319,27 +326,27 @@ class AuthService extends BaseService
             && $data['branch'] !== ''
             && !RegionBranchHelper::branchBelongsToRegion($data['region'], $data['branch'])
         ) {
-            $errors[] = 'Branch does not match the selected region.';
+            ValidationHelper::addError($errors, 'branch', 'Branch does not match the selected region.');
         }
 
         if ($data['middle_initial'] !== '' && !preg_match('/^[A-Z]$/', $data['middle_initial'])) {
-            $errors[] = 'Middle initial must be a single letter.';
+            ValidationHelper::addError($errors, 'middle_initial', 'Middle initial must be a single letter.');
         }
 
         if (!preg_match('/^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.gov\.ph$/i', $data['email'])) {
-            $errors[] = 'Email must use a valid .gov.ph address.';
+            ValidationHelper::addError($errors, 'email', 'Email must use a valid .gov.ph address.');
         }
 
         if ($data['password'] !== $data['password_confirmation']) {
-            $errors[] = 'Password confirmation does not match.';
+            ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation does not match.');
         }
 
         if ($this->users->usernameExists($data['username'])) {
-            $errors[] = 'Username is already in use.';
+            ValidationHelper::addError($errors, 'username', 'Username is already in use.');
         }
 
         if ($this->users->emailExists($data['email'])) {
-            $errors[] = 'Email is already in use.';
+            ValidationHelper::addError($errors, 'email', 'Email is already in use.');
         }
 
         return $errors;

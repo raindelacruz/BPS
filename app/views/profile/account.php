@@ -2,6 +2,7 @@
 
 use App\Helpers\ResponseHelper;
 use App\Helpers\SecurityHelper;
+use App\Helpers\ValidationHelper;
 use App\Helpers\ViewHelper;
 ?>
 <div class="page-head">
@@ -10,22 +11,6 @@ use App\Helpers\ViewHelper;
         <p>Update your account details and password.</p>
     </div>
 </div>
-
-<?php if (!empty($errors)): ?>
-    <div class="flash">
-        <?php foreach ($errors as $error): ?>
-            <div><?= ViewHelper::escape($error); ?></div>
-        <?php endforeach; ?>
-    </div>
-<?php endif; ?>
-
-<?php if (!empty($profileErrors)): ?>
-    <div class="flash">
-        <?php foreach ($profileErrors as $error): ?>
-            <div><?= ViewHelper::escape($error); ?></div>
-        <?php endforeach; ?>
-    </div>
-<?php endif; ?>
 
 <dl class="detail-grid profile-summary-grid">
     <div>
@@ -58,7 +43,10 @@ use App\Helpers\ViewHelper;
 
         <div>
             <label for="email">Email</label>
-            <input id="email" name="email" type="email" value="<?= ViewHelper::escape($user['email']); ?>" required>
+            <input id="email" name="email" type="email" value="<?= ViewHelper::escape($profileOld['email'] ?? $user['email']); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($profileErrors, 'email')); ?>" required>
+            <?php if (ValidationHelper::first($profileErrors, 'email')): ?>
+                <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($profileErrors, 'email')); ?></div>
+            <?php endif; ?>
         </div>
 
         <div></div>
@@ -66,24 +54,19 @@ use App\Helpers\ViewHelper;
         <?php
         $regionFieldId = 'region';
         $branchFieldId = 'branch';
-        $selectedRegion = $user['region'] ?? '';
-        $selectedBranch = $user['branch'] ?? '';
+        $selectedRegion = $profileOld['region'] ?? ($user['region'] ?? '');
+        $selectedBranch = $profileOld['branch'] ?? ($user['branch'] ?? '');
         require __DIR__ . '/../partials/region_branch_fields.php';
         ?>
 
         <div class="btn-row" style="grid-column: 1 / -1;">
             <button type="submit">Update profile</button>
         </div>
+        <?php if (ValidationHelper::first($profileErrors, '_global')): ?>
+            <div class="field-error" style="grid-column: 1 / -1;"><?= ViewHelper::escape((string) ValidationHelper::first($profileErrors, '_global')); ?></div>
+        <?php endif; ?>
     </form>
 </div>
-
-<?php if (!empty($passwordErrors)): ?>
-    <div class="flash">
-        <?php foreach ($passwordErrors as $error): ?>
-            <div><?= ViewHelper::escape($error); ?></div>
-        <?php endforeach; ?>
-    </div>
-<?php endif; ?>
 
 <div class="card-section stack-sm">
     <div class="page-head">
@@ -97,17 +80,26 @@ use App\Helpers\ViewHelper;
 
         <div>
             <label for="password">New password</label>
-            <input id="password" name="password" type="password" required>
+            <input id="password" name="password" type="password" class="<?= ViewHelper::escape(ValidationHelper::inputClass($passwordErrors, 'password')); ?>" required>
+            <?php if (ValidationHelper::first($passwordErrors, 'password')): ?>
+                <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($passwordErrors, 'password')); ?></div>
+            <?php endif; ?>
         </div>
 
         <div>
             <label for="password_confirmation">Confirm new password</label>
-            <input id="password_confirmation" name="password_confirmation" type="password" required>
+            <input id="password_confirmation" name="password_confirmation" type="password" class="<?= ViewHelper::escape(ValidationHelper::inputClass($passwordErrors, 'password_confirmation')); ?>" required>
+            <?php if (ValidationHelper::first($passwordErrors, 'password_confirmation')): ?>
+                <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($passwordErrors, 'password_confirmation')); ?></div>
+            <?php endif; ?>
         </div>
 
         <div class="btn-row" style="grid-column: 1 / -1;">
             <button type="submit">Update password</button>
         </div>
+        <?php if (ValidationHelper::first($passwordErrors, '_global')): ?>
+            <div class="field-error" style="grid-column: 1 / -1;"><?= ViewHelper::escape((string) ValidationHelper::first($passwordErrors, '_global')); ?></div>
+        <?php endif; ?>
     </form>
 </div>
 

@@ -18,18 +18,22 @@ class AuthController extends BaseController
     public function showLogin(array $params = []): void
     {
         SecurityHelper::requireGuest();
+        $state = $this->formState('login', ['username' => '']);
 
         $this->view('auth/login', [
             'title' => 'Login',
-            'errors' => [],
-            'old' => ['username' => ''],
+            'errors' => $state['errors'],
+            'old' => $state['old'],
         ]);
     }
 
     public function login(array $params = []): void
     {
         SecurityHelper::requireGuest();
-        $this->enforceCsrf();
+        $old = [
+            'username' => trim((string) ($_POST['username'] ?? '')),
+        ];
+        $this->enforceCsrfOrRedirect('login', 'login', $old);
 
         $result = $this->authService->attemptLogin($_POST);
 
@@ -37,23 +41,18 @@ class AuthController extends BaseController
             $this->redirect('dashboard');
         }
 
-        $this->view('auth/login', [
-            'title' => 'Login',
-            'errors' => $result['errors'],
-            'old' => [
-                'username' => $_POST['username'] ?? '',
-            ],
-        ]);
+        $this->redirectWithValidation('login', 'login', $result['errors'], $old);
     }
 
     public function showRegister(array $params = []): void
     {
         SecurityHelper::requireGuest();
+        $state = $this->formState('register', $this->registrationDefaults());
 
         $this->view('auth/register', [
             'title' => 'Register',
-            'errors' => [],
-            'old' => $this->registrationDefaults(),
+            'errors' => $state['errors'],
+            'old' => $state['old'],
             'regions' => RegionBranchHelper::regions(),
         ]);
     }
@@ -61,7 +60,16 @@ class AuthController extends BaseController
     public function register(array $params = []): void
     {
         SecurityHelper::requireGuest();
-        $this->enforceCsrf();
+        $old = array_merge($this->registrationDefaults(), [
+            'username' => trim((string) ($_POST['username'] ?? '')),
+            'firstname' => trim((string) ($_POST['firstname'] ?? '')),
+            'middle_initial' => trim((string) ($_POST['middle_initial'] ?? '')),
+            'lastname' => trim((string) ($_POST['lastname'] ?? '')),
+            'region' => trim((string) ($_POST['region'] ?? '')),
+            'branch' => trim((string) ($_POST['branch'] ?? '')),
+            'email' => trim((string) ($_POST['email'] ?? '')),
+        ]);
+        $this->enforceCsrfOrRedirect('register', 'register', $old);
 
         $result = $this->authService->register($_POST);
 
@@ -69,39 +77,18 @@ class AuthController extends BaseController
             $this->redirect('login');
         }
 
-        $this->view('auth/register', [
-            'title' => 'Register',
-            'errors' => $result['errors'],
-            'old' => array_merge($this->registrationDefaults(), [
-                'username' => $_POST['username'] ?? '',
-                'firstname' => $_POST['firstname'] ?? '',
-                'middle_initial' => $_POST['middle_initial'] ?? '',
-                'lastname' => $_POST['lastname'] ?? '',
-                'region' => $_POST['region'] ?? '',
-                'branch' => $_POST['branch'] ?? '',
-                'email' => $_POST['email'] ?? '',
-            ]),
-            'regions' => RegionBranchHelper::regions(),
-        ]);
+        $this->redirectWithValidation('register', 'register', $result['errors'], $old);
     }
 
     public function logout(array $params = []): void
     {
         SecurityHelper::requireAuth();
-        $this->enforceCsrf();
+        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
+            $this->redirectWithError('dashboard', 'Your session expired. Please sign in again if needed.');
+        }
 
         $this->authService->logout();
         $this->redirect('login');
-    }
-
-    private function enforceCsrf(): void
-    {
-        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            $this->json([
-                'success' => false,
-                'message' => 'Invalid CSRF token.',
-            ], 419);
-        }
     }
 
     private function registrationDefaults(): array

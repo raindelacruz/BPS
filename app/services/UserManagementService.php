@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Helpers\LogHelper;
 use App\Helpers\RegionBranchHelper;
+use App\Helpers\ValidationHelper;
 use App\Models\EmailChangeRequest;
 use App\Models\Notice;
 use App\Models\User;
@@ -34,7 +36,7 @@ class UserManagementService extends BaseService
         $target = $users->findById($targetUserId);
 
         if (!$target) {
-            return ['success' => false, 'errors' => ['User not found.']];
+            return ['success' => false, 'errors' => ['_global' => ['User not found.']]];
         }
 
         $data = [
@@ -52,12 +54,12 @@ class UserManagementService extends BaseService
 
         foreach (['username', 'firstname', 'lastname', 'region', 'branch', 'role', 'email'] as $field) {
             if ($data[$field] === '') {
-                $errors[] = ucfirst(str_replace('_', ' ', $field)) . ' is required.';
+                ValidationHelper::addError($errors, $field, ucfirst(str_replace('_', ' ', $field)) . ' is required.');
             }
         }
 
         if ($data['region'] !== '' && !RegionBranchHelper::isValidRegion($data['region'])) {
-            $errors[] = 'Region is invalid.';
+            ValidationHelper::addError($errors, 'region', 'Region is invalid.');
         }
 
         if (
@@ -65,34 +67,34 @@ class UserManagementService extends BaseService
             && $data['branch'] !== ''
             && !RegionBranchHelper::branchBelongsToRegion($data['region'], $data['branch'])
         ) {
-            $errors[] = 'Branch does not match the selected region.';
+            ValidationHelper::addError($errors, 'branch', 'Branch does not match the selected region.');
         }
 
         if (!in_array($data['role'], ['admin', 'author'], true)) {
-            $errors[] = 'Role is invalid.';
+            ValidationHelper::addError($errors, 'role', 'Role is invalid.');
         }
 
         if ($data['middle_initial'] !== '' && !preg_match('/^[A-Z]$/', $data['middle_initial'])) {
-            $errors[] = 'Middle initial must be a single letter.';
+            ValidationHelper::addError($errors, 'middle_initial', 'Middle initial must be a single letter.');
         }
 
         if (!preg_match('/^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.gov\.ph$/i', $data['email'])) {
-            $errors[] = 'Email must use a valid .gov.ph address.';
+            ValidationHelper::addError($errors, 'email', 'Email must use a valid .gov.ph address.');
         }
 
         if ($users->usernameExistsForOther($data['username'], $targetUserId)) {
-            $errors[] = 'Username is already in use.';
+            ValidationHelper::addError($errors, 'username', 'Username is already in use.');
         }
 
         if ($users->emailExistsForOther($data['email'], $targetUserId)) {
-            $errors[] = 'Email is already in use.';
+            ValidationHelper::addError($errors, 'email', 'Email is already in use.');
         }
 
         if ((int) $currentUser['id'] === $targetUserId && $data['role'] !== ($target['role'] ?? null)) {
-            $errors[] = 'You cannot change your own role.';
+            ValidationHelper::addError($errors, 'role', 'You cannot change your own role.');
         }
 
-        if ($errors !== []) {
+        if (ValidationHelper::hasErrors($errors)) {
             return ['success' => false, 'errors' => $errors];
         }
 
@@ -137,7 +139,12 @@ class UserManagementService extends BaseService
                 $connection->rollBack();
             }
 
-            return ['success' => false, 'errors' => ['User could not be updated.']];
+            LogHelper::error('User update failed.', [
+                'target_user_id' => $targetUserId,
+                'current_user_id' => (int) ($currentUser['id'] ?? 0),
+            ], $throwable);
+
+            return ['success' => false, 'errors' => ['_global' => ['User could not be updated.']]];
         }
     }
 
@@ -147,11 +154,11 @@ class UserManagementService extends BaseService
         $target = $users->findById($targetUserId);
 
         if (!$target) {
-            return ['success' => false, 'errors' => ['User not found.']];
+            return ['success' => false, 'errors' => ['_global' => ['User not found.']]];
         }
 
         if ((int) $currentUser['id'] === $targetUserId) {
-            return ['success' => false, 'errors' => ['You cannot deactivate your own account.']];
+            return ['success' => false, 'errors' => ['_global' => ['You cannot deactivate your own account.']]];
         }
 
         $nextState = (int) ($target['is_active'] ?? 0) !== 1;
@@ -167,11 +174,11 @@ class UserManagementService extends BaseService
         $target = $users->findById($targetUserId);
 
         if (!$target) {
-            return ['success' => false, 'errors' => ['User not found.']];
+            return ['success' => false, 'errors' => ['_global' => ['User not found.']]];
         }
 
         if ((int) $currentUser['id'] === $targetUserId) {
-            return ['success' => false, 'errors' => ['You cannot delete your own account.']];
+            return ['success' => false, 'errors' => ['_global' => ['You cannot delete your own account.']]];
         }
 
         $connection = Database::connection();
@@ -188,7 +195,12 @@ class UserManagementService extends BaseService
                 $connection->rollBack();
             }
 
-            return ['success' => false, 'errors' => ['User could not be deleted.']];
+            LogHelper::error('User deletion failed.', [
+                'target_user_id' => $targetUserId,
+                'current_user_id' => (int) ($currentUser['id'] ?? 0),
+            ], $throwable);
+
+            return ['success' => false, 'errors' => ['_global' => ['User could not be deleted.']]];
         }
     }
 
@@ -199,7 +211,7 @@ class UserManagementService extends BaseService
         $request = $requests->findPendingByToken($token);
 
         if (!$request) {
-            return ['success' => false, 'errors' => ['Email change token is invalid or expired.']];
+            return ['success' => false, 'errors' => ['_global' => ['Email change token is invalid or expired.']]];
         }
 
         $connection = Database::connection();
@@ -216,7 +228,12 @@ class UserManagementService extends BaseService
                 $connection->rollBack();
             }
 
-            return ['success' => false, 'errors' => ['Email change could not be completed.']];
+            LogHelper::error('Email change verification failed.', [
+                'request_id' => (int) ($request['id'] ?? 0),
+                'user_id' => (int) ($request['user_id'] ?? 0),
+            ], $throwable);
+
+            return ['success' => false, 'errors' => ['_global' => ['Email change could not be completed.']]];
         }
     }
 }

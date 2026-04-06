@@ -7,8 +7,8 @@ use App\Helpers\ViewHelper;
 ?>
 <div class="section-head">
     <div>
-        <h2>Available Bid Notices</h2>
-        <p>Search by title, reference code, region, or procurement type.</p>
+        <h2>Available Procurement Postings</h2>
+        <p>Search by procurement title, reference number, region, or mode of procurement.</p>
     </div>
     <span class="status-pill"><?= ViewHelper::escape((string) count($bids)); ?> listed</span>
 </div>
@@ -16,7 +16,7 @@ use App\Helpers\ViewHelper;
 <form method="GET" action="<?= ViewHelper::escape(ResponseHelper::url()); ?>" class="public-tools">
     <div class="field search">
         <label for="search">Search</label>
-        <input id="search" name="search" type="text" placeholder="Title, reference code, or keyword" value="<?= ViewHelper::escape($filters['search'] ?? ''); ?>">
+        <input id="search" name="search" type="text" placeholder="Title, reference number, or keyword" value="<?= ViewHelper::escape($filters['search'] ?? ''); ?>">
     </div>
 
     <div class="field">
@@ -51,12 +51,12 @@ use App\Helpers\ViewHelper;
 
 <div class="results-meta">
     <span>Simple public lookup</span>
-    <span>Filtered by active posting period</span>
+    <span>Supports public monitoring of posted stages</span>
     <span><?= ViewHelper::escape((string) count($bids)); ?> result(s)</span>
 </div>
 
 <?php if (empty($bids)): ?>
-    <p>No active bid notices match the current filters.</p>
+    <p>No public procurement postings match the current filters.</p>
 <?php else: ?>
     <div class="public-table-wrap">
         <table>
@@ -66,18 +66,20 @@ use App\Helpers\ViewHelper;
                     <th>Reference</th>
                     <th>Region</th>
                     <th>Procurement</th>
-                    <th>Active Until</th>
+                    <th>Current Stage</th>
+                    <th>Bid Deadline</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($bids as $bid): ?>
                     <tr>
-                        <td><strong><?= ViewHelper::escape($bid['title']); ?></strong></td>
-                        <td><code><?= ViewHelper::escape($bid['reference_code']); ?></code></td>
+                        <td><strong><?= ViewHelper::escape($bid['procurement_title']); ?></strong></td>
+                        <td><code><?= ViewHelper::escape($bid['reference_number']); ?></code></td>
                         <td><?= ViewHelper::escape($bid['region']); ?></td>
-                        <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $bid['procurement_type'])); ?></td>
-                        <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $bid['end_date']))); ?></td>
+                        <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $bid['mode_of_procurement'])); ?></td>
+                        <td><?= ViewHelper::escape(ucwords(str_replace('_', ' ', (string) ($bid['current_stage'] ?? 'draft')))); ?></td>
+                        <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $bid['bid_submission_deadline']))); ?></td>
                         <td><a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('public/notices/' . (int) $bid['id'])); ?>">Open Notice</a></td>
                     </tr>
                 <?php endforeach; ?>

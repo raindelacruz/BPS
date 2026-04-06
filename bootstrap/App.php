@@ -2,6 +2,8 @@
 
 namespace Bootstrap;
 
+use App\Helpers\LogHelper;
+use App\Helpers\ResponseHelper;
 use RuntimeException;
 use Throwable;
 
@@ -100,19 +102,17 @@ class App
     {
         $message = $throwable->getMessage();
 
+        LogHelper::error('Unhandled application exception.', [
+            'method' => $_SERVER['REQUEST_METHOD'] ?? 'CLI',
+            'uri' => $_SERVER['REQUEST_URI'] ?? '',
+        ], $throwable);
+
         if ($throwable instanceof RuntimeException && str_contains($message, 'Database connection failed:')) {
             $this->renderDatabaseSetupError($message);
             return;
         }
 
-        http_response_code(500);
-
-        if ($this->config('app.debug', true)) {
-            echo '<pre>' . htmlspecialchars((string) $throwable, ENT_QUOTES, 'UTF-8') . '</pre>';
-            return;
-        }
-
-        echo 'Internal server error.';
+        ResponseHelper::abort(500, 'An unexpected error occurred. Please try again later.');
     }
 
     private function renderDatabaseSetupError(string $message): void
