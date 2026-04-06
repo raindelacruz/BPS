@@ -14,7 +14,7 @@ class ResponseHelper
 
     public static function redirect(string $path): void
     {
-        $target = str_replace(["\r", "\n"], '', self::url($path));
+        $target = str_replace(["\r", "\n"], '', self::path($path));
         header('Location: ' . $target);
         exit;
     }
@@ -28,10 +28,28 @@ class ResponseHelper
 
     public static function url(string $path = ''): string
     {
+        return self::path($path);
+    }
+
+    public static function absoluteUrl(string $path = ''): string
+    {
         $baseUrl = rtrim(app('app.url', ''), '/');
         $normalizedPath = ltrim($path, '/');
 
         return $normalizedPath === '' ? $baseUrl : $baseUrl . '/' . $normalizedPath;
+    }
+
+    public static function path(string $path = ''): string
+    {
+        $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+        $basePath = rtrim(str_replace('/index.php', '', $scriptName), '/');
+        $normalizedPath = ltrim($path, '/');
+
+        if ($basePath === '') {
+            return $normalizedPath === '' ? '/' : '/' . $normalizedPath;
+        }
+
+        return $normalizedPath === '' ? $basePath : $basePath . '/' . $normalizedPath;
     }
 
     private static function renderErrorPage(int $status, string $message): string
