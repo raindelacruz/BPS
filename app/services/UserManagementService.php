@@ -6,7 +6,9 @@ use App\Helpers\LogHelper;
 use App\Helpers\RegionBranchHelper;
 use App\Helpers\ValidationHelper;
 use App\Models\EmailChangeRequest;
-use App\Models\Notice;
+use App\Models\ParentProcurement;
+use App\Models\ProcurementActivityLog;
+use App\Models\ProcurementDocument;
 use App\Models\User;
 use Bootstrap\Database;
 use DateInterval;
@@ -17,7 +19,9 @@ class UserManagementService extends BaseService
 {
     public function __construct(
         private readonly ?User $users = null,
-        private readonly ?Notice $notices = null,
+        private readonly ?ParentProcurement $parents = null,
+        private readonly ?ProcurementDocument $documents = null,
+        private readonly ?ProcurementActivityLog $activityLogs = null,
         private readonly ?EmailChangeRequest $emailChangeRequests = null,
         private readonly ?EmailService $emailService = null
     ) {
@@ -170,7 +174,9 @@ class UserManagementService extends BaseService
     public function deleteUser(int $targetUserId, array $currentUser): array
     {
         $users = $this->users ?? new User();
-        $notices = $this->notices ?? new Notice();
+        $parents = $this->parents ?? new ParentProcurement();
+        $documents = $this->documents ?? new ProcurementDocument();
+        $activityLogs = $this->activityLogs ?? new ProcurementActivityLog();
         $target = $users->findById($targetUserId);
 
         if (!$target) {
@@ -181,11 +187,18 @@ class UserManagementService extends BaseService
             return ['success' => false, 'errors' => ['_global' => ['You cannot delete your own account.']]];
         }
 
+        if (
+            $parents->hasAnyOwnershipReferences($targetUserId)
+            || $documents->hasAnyOwnershipReferences($targetUserId)
+            || $activityLogs->hasAnyUserReferences($targetUserId)
+        ) {
+            return ['success' => false, 'errors' => ['_global' => ['Users referenced by procurement records or audit logs cannot be deleted.']]];
+        }
+
         $connection = Database::connection();
         $connection->beginTransaction();
 
         try {
-            $notices->reassignUploader($targetUserId, (int) $currentUser['id']);
             $users->deleteById($targetUserId);
             $connection->commit();
 

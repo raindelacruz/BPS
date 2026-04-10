@@ -61,15 +61,10 @@ class ProcurementDocument extends BaseModel
                 title,
                 description,
                 file_path,
+                file_hash,
                 document_type,
                 sequence_stage,
                 posted_at,
-                is_locked,
-                locked_at,
-                lock_reason,
-                is_reopened,
-                reopened_at,
-                reopened_by,
                 created_by,
                 updated_by
             ) VALUES (
@@ -77,15 +72,10 @@ class ProcurementDocument extends BaseModel
                 :title,
                 :description,
                 :file_path,
+                :file_hash,
                 :document_type,
                 :sequence_stage,
                 :posted_at,
-                :is_locked,
-                :locked_at,
-                :lock_reason,
-                :is_reopened,
-                :reopened_at,
-                :reopened_by,
                 :created_by,
                 :updated_by
             )'
@@ -96,43 +86,15 @@ class ProcurementDocument extends BaseModel
             'title' => $data['title'],
             'description' => $data['description'],
             'file_path' => $data['file_path'],
+            'file_hash' => $data['file_hash'],
             'document_type' => $type,
             'sequence_stage' => $meta['stage'],
             'posted_at' => $data['posted_at'],
-            'is_locked' => (int) ($data['is_locked'] ?? 0),
-            'locked_at' => $data['locked_at'] ?? null,
-            'lock_reason' => $data['lock_reason'] ?? null,
-            'is_reopened' => (int) ($data['is_reopened'] ?? 0),
-            'reopened_at' => $data['reopened_at'] ?? null,
-            'reopened_by' => $data['reopened_by'] ?? null,
             'created_by' => $data['created_by'],
             'updated_by' => $data['updated_by'],
         ]);
 
         return (int) $this->connection()->lastInsertId();
-    }
-
-    public function updateById(string $type, int $id, array $data): bool
-    {
-        $meta = $this->meta($type);
-        $statement = $this->connection()->prepare(
-            'UPDATE ' . $meta['table'] . '
-             SET title = :title,
-                 description = :description,
-                 file_path = :file_path,
-                 posted_at = :posted_at,
-                 updated_by = :updated_by
-             WHERE id = :id'
-        );
-
-        return $statement->execute([
-            'id' => $id,
-            'title' => $data['title'],
-            'description' => $data['description'],
-            'file_path' => $data['file_path'],
-            'posted_at' => $data['posted_at'],
-            'updated_by' => $data['updated_by'],
-        ]);
     }
 
     public function findById(string $type, int $id): ?array
@@ -142,11 +104,9 @@ class ProcurementDocument extends BaseModel
             'SELECT d.*,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
-                    creator.lastname AS creator_lastname,
-                    reopener.username AS reopener_username
+                    creator.lastname AS creator_lastname
              FROM ' . $meta['table'] . ' d
              INNER JOIN users creator ON creator.id = d.created_by
-             LEFT JOIN users reopener ON reopener.id = d.reopened_by
              WHERE d.id = :id
              LIMIT 1'
         );
@@ -163,11 +123,9 @@ class ProcurementDocument extends BaseModel
             'SELECT d.*,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
-                    creator.lastname AS creator_lastname,
-                    reopener.username AS reopener_username
+                    creator.lastname AS creator_lastname
              FROM ' . $meta['table'] . ' d
              INNER JOIN users creator ON creator.id = d.created_by
-             LEFT JOIN users reopener ON reopener.id = d.reopened_by
              WHERE d.parent_procurement_id = :parent_procurement_id
              ORDER BY d.posted_at ASC, d.id ASC'
         );
@@ -201,45 +159,6 @@ class ProcurementDocument extends BaseModel
         return (int) $statement->fetchColumn() > 0;
     }
 
-    public function lockForParent(string $type, int $parentId, string $reason): bool
-    {
-        $meta = $this->meta($type);
-        $statement = $this->connection()->prepare(
-            'UPDATE ' . $meta['table'] . '
-             SET is_locked = 1,
-                 locked_at = NOW(),
-                 lock_reason = :lock_reason,
-                 is_reopened = 0,
-                 reopened_at = NULL,
-                 reopened_by = NULL
-             WHERE parent_procurement_id = :parent_procurement_id'
-        );
-
-        return $statement->execute([
-            'parent_procurement_id' => $parentId,
-            'lock_reason' => $reason,
-        ]);
-    }
-
-    public function reopen(string $type, int $id, int $userId): bool
-    {
-        $meta = $this->meta($type);
-        $statement = $this->connection()->prepare(
-            'UPDATE ' . $meta['table'] . '
-             SET is_locked = 0,
-                 lock_reason = NULL,
-                 is_reopened = 1,
-                 reopened_at = NOW(),
-                 reopened_by = :reopened_by
-             WHERE id = :id'
-        );
-
-        return $statement->execute([
-            'id' => $id,
-            'reopened_by' => $userId,
-        ]);
-    }
-
     public function allForParent(int $parentId): array
     {
         $documents = [];
@@ -261,6 +180,39 @@ class ProcurementDocument extends BaseModel
         });
 
         return $documents;
+    }
+
+    public function latestPostedAtForParent(string $type, int $parentId): ?string
+    {
+        $document = $this->findForParent($type, $parentId);
+
+        if ($document === []) {
+            return null;
+        }
+
+        $last = $document[count($document) - 1];
+
+        return (string) ($last['posted_at'] ?? null);
+    }
+
+    public function hasAnyOwnershipReferences(int $userId): bool
+    {
+        foreach (self::types() as $type) {
+            $meta = $this->meta($type);
+            $statement = $this->connection()->prepare(
+                'SELECT COUNT(*)
+                 FROM ' . $meta['table'] . '
+                 WHERE created_by = :user_id
+                    OR updated_by = :user_id'
+            );
+            $statement->execute(['user_id' => $userId]);
+
+            if ((int) $statement->fetchColumn() > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function label(string $type): string

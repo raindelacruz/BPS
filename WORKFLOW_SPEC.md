@@ -206,7 +206,7 @@ This document defines the current eBPS business workflow as implemented in the e
 
 ### `pending`
 - assigned when new notice start date is in the future
-- editable
+- posted record remains read-only; any pre-posting edits must happen in a separate draft workflow
 - not publicly visible as active bid
 
 ### `active`
@@ -239,16 +239,16 @@ This document defines the current eBPS business workflow as implemented in the e
 
 | State | View | Edit | Delete | Archive | Public Bid Display |
 |---|---|---|---|---|---|
-| `pending` | yes | yes | yes | possible only if archive rules pass | no |
+| `pending` | yes | no | yes | possible only if archive rules pass | no |
 | `active` | yes | no | yes | possible only if archive rules pass | yes for bids |
 | `expired` | yes | no | yes | yes | no |
 | `archived` | yes in archive list | no | not part of active flow | unarchive instead | no |
 
 ## Editing Rules
-- only notices with `status = pending` may be edited
-- only uploader or admin may access edit/update flow
-- edit updates the same database row
-- edit may replace the PDF
+- posted procurement records are immutable
+- no edit, reopen, unlock, or file replacement is allowed after posting
+- upstream records must remain unchanged after downstream records are posted
+- corrections must be handled through separate subsequent or corrective records, not by modifying the original row
 
 ## Deletion Rules
 - only uploader may delete a notice
@@ -296,7 +296,7 @@ This document defines the current eBPS business workflow as implemented in the e
 | create award | resolution exists, no same-ref award | missing resolution, duplicate award |
 | create contract | award exists, no same-ref contract | missing award, duplicate contract |
 | create proceed | contract exists, no same-ref proceed | missing contract, duplicate proceed |
-| edit notice | notice is pending, user is uploader/admin | non-pending, no permission |
+| edit notice | not supported for posted procurement records | all posted records are immutable |
 | delete notice | user is uploader | not uploader |
 | archive set | uploader and (`proceed` exists or notice expired) | uploader rule fails or archive prerequisites fail |
 | public bid display | active, non-archived bid | pending, expired, archived, non-bid |

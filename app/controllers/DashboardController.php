@@ -21,7 +21,7 @@ class DashboardController extends BaseController
 
         $this->view('dashboard/index', [
             'title' => 'Dashboard',
-            'message' => 'Dashboard access is role-based, and notice statuses are recalculated on load.',
+            'message' => 'Posting availability is recalculated from authoritative publication, deadline, and archive fields and shown separately from workflow stage.',
             'currentUser' => $currentUser,
             'overview' => $this->dashboardQuery->overview($currentUser),
         ]);

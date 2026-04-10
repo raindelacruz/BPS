@@ -4,9 +4,17 @@ namespace App\Controllers;
 
 use App\Helpers\SecurityHelper;
 use App\Helpers\SessionHelper;
+use App\Services\ProcurementPostingService;
 
 class ArchiveController extends BaseController
 {
+    private ProcurementPostingService $posting;
+
+    public function __construct()
+    {
+        $this->posting = new ProcurementPostingService();
+    }
+
     public function archive(array $params = []): void
     {
         SecurityHelper::requireAuth();
@@ -15,7 +23,8 @@ class ArchiveController extends BaseController
             $this->redirect('notices');
         }
 
-        SessionHelper::flash('error', 'Archiving is disabled for the strict sequential posting module.');
+        $result = $this->posting->archiveParent((int) ($params['id'] ?? 0), SecurityHelper::currentUser() ?? [], $_POST);
+        SessionHelper::flash($result['allowed'] ? 'success' : 'error', $result['allowed'] ? 'Procurement record archived successfully.' : ($result['errors'][0] ?? 'Procurement record could not be archived.'));
         $this->redirect('notices/' . (int) ($params['id'] ?? 0));
     }
 
@@ -27,7 +36,8 @@ class ArchiveController extends BaseController
             $this->redirect('notices');
         }
 
-        SessionHelper::flash('error', 'Unarchiving is disabled for the strict sequential posting module.');
+        $result = $this->posting->unarchiveParent((int) ($params['id'] ?? 0), SecurityHelper::currentUser() ?? []);
+        SessionHelper::flash('error', $result['errors'][0] ?? 'Procurement record could not be restored.');
         $this->redirect('notices/' . (int) ($params['id'] ?? 0));
     }
 }

@@ -423,13 +423,19 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             text-transform: capitalize;
             white-space: nowrap;
         }
-        .status-badge.pending {
+        .status-badge.pending,
+        .status-badge.scheduled {
             background: #fef3c7;
             color: #92400e;
         }
-        .status-badge.active {
+        .status-badge.active,
+        .status-badge.open {
             background: #dcfce7;
             color: #166534;
+        }
+        .status-badge.closed {
+            background: #fee2e2;
+            color: #991b1b;
         }
         .status-badge.expired,
         .status-badge.archived,
@@ -490,7 +496,7 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
                     <img src="<?= ViewHelper::escape(ResponseHelper::url('assets/logo-nfa-da.jpg')); ?>" alt="Agency logo">
                     <div>
                         <h1><?= ViewHelper::escape($appName); ?></h1>
-                        <p>Internal notice and workflow management</p>
+                        <p>Official procurement posting and lifecycle management</p>
                     </div>
                 </div>
                 <div class="topbar-right">

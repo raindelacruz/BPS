@@ -28,7 +28,8 @@ class WorkflowValidationController extends BaseController
                 'reference_code' => $notice['reference_number'],
                 'region' => $notice['region'],
                 'procurement_type' => $notice['mode_of_procurement'],
-                'status' => $notice['status'],
+                'posting_status' => $notice['posting_status'],
+                'workflow_stage' => $notice['current_stage'],
             ];
         }, $records);
 

@@ -35,7 +35,7 @@ class PublicNoticeController extends BaseController
     public function show(array $params = []): void
     {
         $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
-        if (!$workflow || (int) ($workflow['parent']['is_archived'] ?? 0) === 1 || ($workflow['parent']['status'] ?? '') === 'pending') {
+        if (!$workflow || !$this->posting->isPubliclyVisible($workflow['parent'])) {
             ResponseHelper::abort(404, 'Public notice not found.');
         }
 
@@ -55,7 +55,7 @@ class PublicNoticeController extends BaseController
         $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
         $bidNotice = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null;
 
-        if (!$workflow || !$bidNotice || (int) ($workflow['parent']['is_archived'] ?? 0) === 1 || ($workflow['parent']['status'] ?? '') === 'pending') {
+        if (!$workflow || !$bidNotice || !$this->posting->isPubliclyVisible($workflow['parent'])) {
             ResponseHelper::abort(404, 'Public notice file not found.');
         }
 
@@ -67,7 +67,7 @@ class PublicNoticeController extends BaseController
         $type = trim((string) ($params['type'] ?? ''));
         $document = (new ProcurementDocument())->findById($type, (int) ($params['id'] ?? 0));
         $workflow = $document ? $this->posting->findParentWithWorkflow((int) $document['parent_procurement_id']) : null;
-        if (!$document || !$workflow || (int) ($workflow['parent']['is_archived'] ?? 0) === 1 || ($workflow['parent']['status'] ?? '') === 'pending') {
+        if (!$document || !$workflow || !$this->posting->isPubliclyVisible($workflow['parent'])) {
             ResponseHelper::abort(404, 'Public notice file not found.');
         }
 

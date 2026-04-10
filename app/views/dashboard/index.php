@@ -19,10 +19,10 @@ $currentUser = SecurityHelper::currentUser();
 </div>
 <?php if (!empty($overview)): ?>
     <div class="metric-grid">
-        <div class="metric-card"><dt>Total bids</dt><strong><?= ViewHelper::escape((string) ($overview['total_bids'] ?? 0)); ?></strong></div>
-        <div class="metric-card"><dt>Pending</dt><strong><?= ViewHelper::escape((string) ($overview['pending'] ?? 0)); ?></strong></div>
-        <div class="metric-card"><dt>Active</dt><strong><?= ViewHelper::escape((string) ($overview['active'] ?? 0)); ?></strong></div>
-        <div class="metric-card"><dt>Expired</dt><strong><?= ViewHelper::escape((string) ($overview['expired'] ?? 0)); ?></strong></div>
+        <div class="metric-card"><dt>Total Procurements</dt><strong><?= ViewHelper::escape((string) ($overview['total_procurements'] ?? 0)); ?></strong></div>
+        <div class="metric-card"><dt>Scheduled</dt><strong><?= ViewHelper::escape((string) ($overview['scheduled'] ?? 0)); ?></strong></div>
+        <div class="metric-card"><dt>Open for Bids</dt><strong><?= ViewHelper::escape((string) ($overview['open'] ?? 0)); ?></strong></div>
+        <div class="metric-card"><dt>Closed for Bids</dt><strong><?= ViewHelper::escape((string) ($overview['closed'] ?? 0)); ?></strong></div>
         <div class="metric-card"><dt>Archived</dt><strong><?= ViewHelper::escape((string) ($overview['archived'] ?? 0)); ?></strong></div>
         <?php if (isset($overview['users'])): ?>
             <div class="metric-card"><dt>Users</dt><strong><?= ViewHelper::escape((string) $overview['users']); ?></strong></div>
@@ -31,10 +31,10 @@ $currentUser = SecurityHelper::currentUser();
 <?php endif; ?>
 <div class="card-section stack-sm">
     <div class="page-head">
-        <div>
-            <h2>Quick Actions</h2>
-            <p>Common tasks for day-to-day notice management.</p>
-        </div>
+    <div>
+        <h2>Quick Actions</h2>
+        <p>Common tasks for official procurement posting and lifecycle management.</p>
+    </div>
     </div>
     <div class="action-row">
         <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices')); ?>">Manage bid notices</a>

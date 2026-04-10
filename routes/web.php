@@ -36,14 +36,8 @@ router()->get('/notices/related/create', [NoticeController::class, 'createRelate
 router()->post('/notices/related', [NoticeController::class, 'storeRelated']);
 router()->get('/notices/{id}', [NoticeController::class, 'show']);
 router()->get('/notices/{id}/file', [NoticeController::class, 'file']);
-router()->get('/notices/{id}/edit', [NoticeController::class, 'edit']);
-router()->post('/notices/{id}/update', [NoticeController::class, 'update']);
-router()->get('/documents/{type}/{id}/edit', [NoticeController::class, 'editDocument']);
-router()->post('/documents/{type}/{id}/update', [NoticeController::class, 'updateDocument']);
-router()->post('/documents/{type}/{id}/reopen', [NoticeController::class, 'reopenDocument']);
 router()->get('/documents/{type}/{id}/file', [NoticeController::class, 'documentFile']);
 router()->get('/public/documents/{type}/{id}/file', [PublicNoticeController::class, 'documentFile']);
 router()->post('/notices/{id}/delete', [NoticeController::class, 'destroy']);
 router()->post('/notices/{id}/archive', [ArchiveController::class, 'archive']);
-router()->post('/notices/{id}/unarchive', [ArchiveController::class, 'unarchive']);
 router()->get('/api/workflow/eligible-bids', [WorkflowValidationController::class, 'eligibleBids']);

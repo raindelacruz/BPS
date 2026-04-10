@@ -20,7 +20,7 @@ foreach ($eligibleParents as $parent) {
 <div class="related-create-page">
     <div class="related-create-head">
         <h1>Post Procurement Document</h1>
-        <p>Post an approved signed document under an existing procurement record. Sequence rules are enforced both here and on submit.</p>
+        <p>Post an approved signed document under an existing official procurement record. Sequence and chronology rules are enforced both here and on submit.</p>
     </div>
 
     <form class="related-create-form" method="POST" action="<?= ViewHelper::escape(ResponseHelper::url('notices/related')); ?>" enctype="multipart/form-data">

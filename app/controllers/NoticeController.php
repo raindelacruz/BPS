@@ -2,7 +2,6 @@
 
 namespace App\Controllers;
 
-use App\Helpers\LogHelper;
 use App\Helpers\ResponseHelper;
 use App\Helpers\SecurityHelper;
 use App\Helpers\SessionHelper;
@@ -35,13 +34,13 @@ class NoticeController extends BaseController
         $user = $this->currentUser();
         $records = $this->posting->listForUser($user);
 
-        $pending = array_values(array_filter($records, static fn (array $record): bool => ($record['status'] ?? '') === 'pending'));
-        $archived = array_values(array_filter($records, static fn (array $record): bool => (int) ($record['is_archived'] ?? 0) === 1));
+        $scheduled = array_values(array_filter($records, static fn (array $record): bool => ($record['posting_status'] ?? '') === ProcurementPostingService::POSTING_STATUS_SCHEDULED));
+        $archived = array_values(array_filter($records, static fn (array $record): bool => ($record['posting_status'] ?? '') === ProcurementPostingService::POSTING_STATUS_ARCHIVED));
 
         $this->view('notice/pending-list', [
             'title' => 'Procurement Postings',
             'notices' => $records,
-            'pendingNotices' => $pending,
+            'scheduledNotices' => $scheduled,
             'archivedNotices' => $archived,
             'currentUser' => $user,
             'documentTypes' => $this->posting->documentTypes(),
@@ -245,50 +244,6 @@ class NoticeController extends BaseController
             ResponseHelper::abort(404, 'Procurement posting not found.');
         }
 
-        $currentUser = $this->currentUser();
-        $editability = [
-            ProcurementDocument::TYPE_BID_NOTICE => ['allowed' => false, 'errors' => []],
-            ProcurementDocument::TYPE_SBB => [],
-            ProcurementDocument::TYPE_RESOLUTION => ['allowed' => false, 'errors' => []],
-            ProcurementDocument::TYPE_AWARD => ['allowed' => false, 'errors' => []],
-            ProcurementDocument::TYPE_CONTRACT => ['allowed' => false, 'errors' => []],
-            ProcurementDocument::TYPE_NOTICE_TO_PROCEED => ['allowed' => false, 'errors' => []],
-        ];
-
-        $bidNotice = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null;
-        if ($bidNotice) {
-            $editability[ProcurementDocument::TYPE_BID_NOTICE] = $this->posting->canEditDocument(
-                ProcurementDocument::TYPE_BID_NOTICE,
-                $bidNotice,
-                $workflow['parent'],
-                $workflow['documents'],
-                $currentUser
-            );
-        }
-
-        foreach ($workflow['documents'][ProcurementDocument::TYPE_SBB] ?? [] as $document) {
-            $editability[ProcurementDocument::TYPE_SBB][(int) $document['id']] = $this->posting->canEditDocument(
-                ProcurementDocument::TYPE_SBB,
-                $document,
-                $workflow['parent'],
-                $workflow['documents'],
-                $currentUser
-            );
-        }
-
-        foreach ([ProcurementDocument::TYPE_RESOLUTION, ProcurementDocument::TYPE_AWARD, ProcurementDocument::TYPE_CONTRACT, ProcurementDocument::TYPE_NOTICE_TO_PROCEED] as $type) {
-            $document = $workflow['documents'][$type][0] ?? null;
-            if ($document) {
-                $editability[$type] = $this->posting->canEditDocument(
-                    $type,
-                    $document,
-                    $workflow['parent'],
-                    $workflow['documents'],
-                    $currentUser
-                );
-            }
-        }
-
         $this->view('notice/view', [
             'title' => $workflow['parent']['procurement_title'],
             'parent' => $workflow['parent'],
@@ -296,284 +251,8 @@ class NoticeController extends BaseController
             'timeline' => $workflow['timeline'],
             'actions' => $workflow['actions'],
             'activityLogs' => $workflow['activityLogs'],
-            'currentUser' => SecurityHelper::currentUser(),
-            'editability' => $editability,
+            'currentUser' => $this->currentUser(),
         ]);
-    }
-
-    public function edit(array $params = []): void
-    {
-        SecurityHelper::requireAuth();
-        $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
-        if (!$workflow) {
-            ResponseHelper::abort(404, 'Procurement posting not found.');
-        }
-
-        $bidNotice = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null;
-        if (!$bidNotice) {
-            ResponseHelper::abort(404, 'Bid notice not found.');
-        }
-
-        $guard = $this->posting->canEditDocument(ProcurementDocument::TYPE_BID_NOTICE, $bidNotice, $workflow['parent'], $workflow['documents'], $this->currentUser());
-        if (!$guard['allowed']) {
-            ResponseHelper::abort(403, implode(' ', $guard['errors']));
-        }
-
-        $state = $this->formState('notice-edit-' . (int) ($workflow['parent']['id'] ?? 0), $this->oldFromParent($workflow['parent']));
-
-        $this->view('notice/edit', [
-            'title' => 'Edit Procurement Posting',
-            'errors' => $state['errors'],
-            'isParentEdit' => true,
-            'notice' => $workflow['parent'],
-            'old' => $state['old'],
-            'procurementTypes' => $this->posting->procurementTypes(),
-        ]);
-    }
-
-    public function update(array $params = []): void
-    {
-        SecurityHelper::requireAuth();
-        $user = $this->currentUser();
-        $parentId = (int) ($params['id'] ?? 0);
-        $old = array_merge($this->parentDefaults($user), [
-            'procurement_title' => trim((string) ($_POST['procurement_title'] ?? '')),
-            'reference_number' => trim((string) ($_POST['reference_number'] ?? '')),
-            'abc' => trim((string) ($_POST['abc'] ?? '')),
-            'mode_of_procurement' => trim((string) ($_POST['mode_of_procurement'] ?? '')),
-            'posting_date' => trim((string) ($_POST['posting_date'] ?? '')),
-            'bid_submission_deadline' => trim((string) ($_POST['bid_submission_deadline'] ?? '')),
-            'description' => trim((string) ($_POST['description'] ?? '')),
-        ]);
-        $redirectPath = 'notices/' . $parentId . '/edit';
-        $this->enforceCsrfOrRedirect($redirectPath, 'notice-edit-' . $parentId, $old);
-        $validation = $this->posting->validateParentInput($_POST, $parentId);
-        $fileErrors = $this->validatePdfUpload($_FILES['notice_pdf'] ?? null, false);
-
-        $errors = $validation['errors'];
-        foreach ($fileErrors as $field => $messages) {
-            foreach ($messages as $message) {
-                ValidationHelper::addError($errors, $field, $message);
-            }
-        }
-
-        if (ValidationHelper::hasErrors($errors)) {
-            $this->redirectWithValidation($redirectPath, 'notice-edit-' . $parentId, $errors, array_merge($old, $validation['data']));
-            return;
-        }
-
-        $workflow = $this->posting->findParentWithWorkflow($parentId);
-        if (!$workflow) {
-            ResponseHelper::abort(404, 'Procurement posting not found.');
-        }
-
-        $connection = Database::connection();
-        $connection->beginTransaction();
-        $newFilePath = null;
-        $oldFilePath = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0]['file_path'] ?? null;
-
-        try {
-            if (($_FILES['notice_pdf']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-                $newFilePath = $this->uploads->storeNoticePdf($_FILES['notice_pdf']);
-            }
-
-            $result = $this->posting->updateParent($parentId, $validation['data'], $user, $newFilePath);
-            if (!$result['allowed']) {
-                if ($connection->inTransaction()) {
-                    $connection->rollBack();
-                }
-                $this->uploads->delete($newFilePath);
-                $errors = [];
-                foreach ($result['errors'] as $message) {
-                    ValidationHelper::addError($errors, '_global', $message);
-                }
-                $this->redirectWithValidation($redirectPath, 'notice-edit-' . $parentId, $errors, array_merge($this->oldFromParent($workflow['parent']), $validation['data']));
-            }
-
-            $connection->commit();
-            if ($newFilePath !== null) {
-                $this->uploads->delete($oldFilePath);
-            }
-
-            SessionHelper::flash('success', 'Procurement posting updated successfully.');
-            $this->redirect('notices/' . $parentId);
-        } catch (Throwable $throwable) {
-            if ($connection->inTransaction()) {
-                $connection->rollBack();
-            }
-            $this->uploads->delete($newFilePath);
-            $this->handleFormException(
-                $throwable,
-                'Procurement record update failed.',
-                $redirectPath,
-                'Procurement posting could not be updated.',
-                'notice-edit-' . $parentId,
-                array_merge($this->oldFromParent($workflow['parent']), $validation['data']),
-                [
-                    'user_id' => (int) ($user['id'] ?? 0),
-                    'parent_procurement_id' => $parentId,
-                ]
-            );
-        }
-    }
-
-    public function editDocument(array $params = []): void
-    {
-        SecurityHelper::requireAuth();
-        $type = trim((string) ($params['type'] ?? ''));
-        $documentId = (int) ($params['id'] ?? 0);
-        $document = (new ProcurementDocument())->findById($type, $documentId);
-        if (!$document) {
-            ResponseHelper::abort(404, 'Document not found.');
-        }
-
-        $workflow = $this->posting->findParentWithWorkflow((int) $document['parent_procurement_id']);
-        if (!$workflow) {
-            ResponseHelper::abort(404, 'Procurement posting not found.');
-        }
-
-        $guard = $this->posting->canEditDocument($type, $document, $workflow['parent'], $workflow['documents'], $this->currentUser());
-        if (!$guard['allowed']) {
-            ResponseHelper::abort(403, implode(' ', $guard['errors']));
-        }
-
-        $state = $this->formState('notice-document-edit-' . $type . '-' . $documentId, $this->oldFromDocument($type, $document));
-
-        $this->view('notice/edit', [
-            'title' => 'Edit ' . ProcurementDocument::label($type),
-            'errors' => $state['errors'],
-            'isParentEdit' => false,
-            'notice' => $document,
-            'documentType' => $type,
-            'old' => $state['old'],
-            'procurementTypes' => $this->posting->procurementTypes(),
-        ]);
-    }
-
-    public function updateDocument(array $params = []): void
-    {
-        SecurityHelper::requireAuth();
-        $type = trim((string) ($params['type'] ?? ''));
-        $documentId = (int) ($params['id'] ?? 0);
-        $old = [
-            'type' => $type,
-            'parent_procurement_id' => (int) ($_POST['parent_procurement_id'] ?? 0),
-            'title' => trim((string) ($_POST['title'] ?? '')),
-            'posted_at' => trim((string) ($_POST['posted_at'] ?? '')),
-            'description' => trim((string) ($_POST['description'] ?? '')),
-        ];
-        $redirectPath = 'documents/' . $type . '/' . $documentId . '/edit';
-        $this->enforceCsrfOrRedirect($redirectPath, 'notice-document-edit-' . $type . '-' . $documentId, $old);
-        $validation = $this->posting->validateDocumentInput($_POST + ['type' => $type]);
-        $fileErrors = $this->validatePdfUpload($_FILES['notice_pdf'] ?? null, false);
-        $document = (new ProcurementDocument())->findById($type, $documentId);
-        if (!$document) {
-            ResponseHelper::abort(404, 'Document not found.');
-        }
-
-        $errors = $validation['errors'];
-        foreach ($fileErrors as $field => $messages) {
-            foreach ($messages as $message) {
-                ValidationHelper::addError($errors, $field, $message);
-            }
-        }
-
-        if (ValidationHelper::hasErrors($errors)) {
-            $this->redirectWithValidation($redirectPath, 'notice-document-edit-' . $type . '-' . $documentId, $errors, array_merge($this->oldFromDocument($type, $document), $validation['data']));
-            return;
-        }
-
-        $connection = Database::connection();
-        $connection->beginTransaction();
-        $newFilePath = null;
-
-        try {
-            if (($_FILES['notice_pdf']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-                $newFilePath = $this->uploads->storeNoticePdf($_FILES['notice_pdf']);
-            }
-
-            $result = $this->posting->updateDocument($type, $documentId, $validation['data'], $this->currentUser(), $newFilePath);
-            if (!$result['allowed']) {
-                if ($connection->inTransaction()) {
-                    $connection->rollBack();
-                }
-                $this->uploads->delete($newFilePath);
-                $errors = [];
-                foreach ($result['errors'] as $message) {
-                    ValidationHelper::addError($errors, '_global', $message);
-                }
-                $this->redirectWithValidation($redirectPath, 'notice-document-edit-' . $type . '-' . $documentId, $errors, array_merge($this->oldFromDocument($type, $document), $validation['data']));
-            }
-
-            $connection->commit();
-            if ($newFilePath !== null) {
-                $this->uploads->delete($document['file_path'] ?? null);
-            }
-
-            SessionHelper::flash('success', ProcurementDocument::label($type) . ' updated successfully.');
-            $this->redirect('notices/' . (int) $document['parent_procurement_id']);
-        } catch (Throwable $throwable) {
-            if ($connection->inTransaction()) {
-                $connection->rollBack();
-            }
-            $this->uploads->delete($newFilePath);
-            $this->handleFormException(
-                $throwable,
-                'Procurement document update failed.',
-                $redirectPath,
-                'Document could not be updated.',
-                'notice-document-edit-' . $type . '-' . $documentId,
-                array_merge($this->oldFromDocument($type, $document), $validation['data']),
-                [
-                    'user_id' => (int) (($this->currentUser()['id'] ?? 0)),
-                    'type' => $type,
-                    'document_id' => $documentId,
-                ]
-            );
-        }
-    }
-
-    public function reopenDocument(array $params = []): void
-    {
-        SecurityHelper::requireAuth();
-        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            SessionHelper::flash('error', 'Your session expired. Please try again.');
-            $this->redirect('notices');
-        }
-        $type = trim((string) ($params['type'] ?? ''));
-        $documentId = (int) ($params['id'] ?? 0);
-        $document = (new ProcurementDocument())->findById($type, $documentId);
-        if (!$document) {
-            ResponseHelper::abort(404, 'Document not found.');
-        }
-
-        $connection = Database::connection();
-        $connection->beginTransaction();
-
-        try {
-            $result = $this->posting->reopenDocument($type, $documentId, $this->currentUser());
-            if (!$result['allowed']) {
-                if ($connection->inTransaction()) {
-                    $connection->rollBack();
-                }
-                SessionHelper::flash('error', implode(' ', $result['errors']));
-                $this->redirect('notices/' . (int) $document['parent_procurement_id']);
-            }
-            $connection->commit();
-            SessionHelper::flash('success', ProcurementDocument::label($type) . ' reopened for editing.');
-        } catch (Throwable $throwable) {
-            if ($connection->inTransaction()) {
-                $connection->rollBack();
-            }
-            LogHelper::error('Document reopen failed.', [
-                'type' => $type,
-                'document_id' => $documentId,
-                'user_id' => (int) (($this->currentUser()['id'] ?? 0)),
-            ], $throwable);
-            SessionHelper::flash('error', 'Document could not be reopened.');
-        }
-
-        $this->redirect('notices/' . (int) $document['parent_procurement_id']);
     }
 
     public function file(array $params = []): void
@@ -669,27 +348,4 @@ class NoticeController extends BaseController
         ];
     }
 
-    private function oldFromParent(array $parent): array
-    {
-        return [
-            'procurement_title' => $parent['procurement_title'] ?? '',
-            'reference_number' => $parent['reference_number'] ?? '',
-            'abc' => $parent['abc'] ?? '',
-            'mode_of_procurement' => $parent['mode_of_procurement'] ?? '',
-            'posting_date' => isset($parent['posting_date']) ? date('Y-m-d\TH:i', strtotime((string) $parent['posting_date'])) : '',
-            'bid_submission_deadline' => isset($parent['bid_submission_deadline']) ? date('Y-m-d\TH:i', strtotime((string) $parent['bid_submission_deadline'])) : '',
-            'description' => $parent['description'] ?? '',
-        ];
-    }
-
-    private function oldFromDocument(string $type, array $document): array
-    {
-        return [
-            'type' => $type,
-            'parent_procurement_id' => $document['parent_procurement_id'] ?? 0,
-            'title' => $document['title'] ?? '',
-            'posted_at' => isset($document['posted_at']) ? date('Y-m-d\TH:i', strtotime((string) $document['posted_at'])) : '',
-            'description' => $document['description'] ?? '',
-        ];
-    }
 }

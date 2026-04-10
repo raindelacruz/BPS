@@ -11,7 +11,7 @@ $deadlineValue = isset($old['bid_submission_deadline']) ? str_replace(' ', 'T', 
 <div class="page-head">
     <div>
         <h1>Create Procurement Posting</h1>
-        <p>Create one procurement record per project, then post the signed documents in legal sequence under that record.</p>
+        <p>Create one official public procurement record per project, then post the signed documents in strict legal sequence under that record.</p>
     </div>
 </div>
 
@@ -35,7 +35,7 @@ $deadlineValue = isset($old['bid_submission_deadline']) ? str_replace(' ', 'T', 
     </div>
 
     <div>
-        <label for="abc">ABC</label>
+        <label for="abc">APPROVED BUDGET FOR THE CONTRACT</label>
         <input id="abc" name="abc" type="number" min="0" step="0.01" value="<?= ViewHelper::escape((string) ($old['abc'] ?? '')); ?>" class="<?= ViewHelper::escape(ValidationHelper::inputClass($errors, 'abc')); ?>" required>
         <?php if (ValidationHelper::first($errors, 'abc')): ?>
             <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($errors, 'abc')); ?></div>
@@ -97,7 +97,7 @@ $deadlineValue = isset($old['bid_submission_deadline']) ? str_replace(' ', 'T', 
         <?php if (ValidationHelper::first($errors, 'notice_pdf')): ?>
             <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($errors, 'notice_pdf')); ?></div>
         <?php endif; ?>
-        <p class="helper-text">This uploads the signed Bid Notice / Invitation to Bid that starts the posting sequence.</p>
+        <p class="helper-text">This uploads the signed Bid Notice / Invitation to Bid that starts the official public procurement lifecycle.</p>
     </div>
 
     <?php if (ValidationHelper::first($errors, '_global')): ?>

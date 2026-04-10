@@ -15,10 +15,14 @@ class ParentProcurement extends BaseModel
                 posting_date,
                 bid_submission_deadline,
                 description,
-                status,
+                posting_status,
                 current_stage,
-                is_archived,
                 archived_at,
+                archive_reason,
+                archived_by,
+                archive_approval_reference,
+                archive_approved_by,
+                archive_approved_at,
                 region,
                 branch,
                 created_by,
@@ -31,10 +35,14 @@ class ParentProcurement extends BaseModel
                 :posting_date,
                 :bid_submission_deadline,
                 :description,
-                :status,
+                :posting_status,
                 :current_stage,
-                :is_archived,
                 :archived_at,
+                :archive_reason,
+                :archived_by,
+                :archive_approval_reference,
+                :archive_approved_by,
+                :archive_approved_at,
                 :region,
                 :branch,
                 :created_by,
@@ -50,10 +58,14 @@ class ParentProcurement extends BaseModel
             'posting_date' => $data['posting_date'],
             'bid_submission_deadline' => $data['bid_submission_deadline'],
             'description' => $data['description'],
-            'status' => $data['status'],
+            'posting_status' => $data['posting_status'],
             'current_stage' => $data['current_stage'],
-            'is_archived' => (int) ($data['is_archived'] ?? 0),
             'archived_at' => $data['archived_at'] ?? null,
+            'archive_reason' => $data['archive_reason'] ?? null,
+            'archived_by' => $data['archived_by'] ?? null,
+            'archive_approval_reference' => $data['archive_approval_reference'] ?? null,
+            'archive_approved_by' => $data['archive_approved_by'] ?? null,
+            'archive_approved_at' => $data['archive_approved_at'] ?? null,
             'region' => $data['region'],
             'branch' => $data['branch'] ?? null,
             'created_by' => $data['created_by'],
@@ -74,10 +86,14 @@ class ParentProcurement extends BaseModel
                  posting_date = :posting_date,
                  bid_submission_deadline = :bid_submission_deadline,
                  description = :description,
-                 status = :status,
+                 posting_status = :posting_status,
                  current_stage = :current_stage,
-                 is_archived = :is_archived,
                  archived_at = :archived_at,
+                 archive_reason = :archive_reason,
+                 archived_by = :archived_by,
+                 archive_approval_reference = :archive_approval_reference,
+                 archive_approved_by = :archive_approved_by,
+                 archive_approved_at = :archive_approved_at,
                  region = :region,
                  branch = :branch,
                  updated_by = :updated_by
@@ -93,29 +109,70 @@ class ParentProcurement extends BaseModel
             'posting_date' => $data['posting_date'],
             'bid_submission_deadline' => $data['bid_submission_deadline'],
             'description' => $data['description'],
-            'status' => $data['status'],
+            'posting_status' => $data['posting_status'],
             'current_stage' => $data['current_stage'],
-            'is_archived' => (int) ($data['is_archived'] ?? 0),
             'archived_at' => $data['archived_at'] ?? null,
+            'archive_reason' => $data['archive_reason'] ?? null,
+            'archived_by' => $data['archived_by'] ?? null,
+            'archive_approval_reference' => $data['archive_approval_reference'] ?? null,
+            'archive_approved_by' => $data['archive_approved_by'] ?? null,
+            'archive_approved_at' => $data['archive_approved_at'] ?? null,
             'region' => $data['region'],
             'branch' => $data['branch'] ?? null,
             'updated_by' => $data['updated_by'],
         ]);
     }
 
-    public function updateStageAndStatus(int $id, string $stage, string $status): bool
+    public function updateWorkflowAndPostingState(int $id, string $stage, string $postingStatus): bool
     {
         $statement = $this->connection()->prepare(
             'UPDATE parent_procurement
              SET current_stage = :current_stage,
-                 status = :status
+                 posting_status = :posting_status,
+                 updated_at = NOW()
              WHERE id = :id'
         );
 
         return $statement->execute([
             'id' => $id,
             'current_stage' => $stage,
-            'status' => $status,
+            'posting_status' => $postingStatus,
+        ]);
+    }
+
+    public function updateArchiveState(
+        int $id,
+        string $archivedAt,
+        string $postingStatus,
+        string $archiveReason,
+        string $approvalReference,
+        int $archivedBy,
+        int $approvedBy
+    ): bool
+    {
+        $statement = $this->connection()->prepare(
+            'UPDATE parent_procurement
+             SET posting_status = :posting_status,
+                 archived_at = :archived_at,
+                 archive_reason = :archive_reason,
+                 archived_by = :archived_by,
+                 archive_approval_reference = :archive_approval_reference,
+                 archive_approved_by = :archive_approved_by,
+                 archive_approved_at = :archive_approved_at,
+                 updated_by = :updated_by
+             WHERE id = :id'
+        );
+
+        return $statement->execute([
+            'id' => $id,
+            'posting_status' => $postingStatus,
+            'archived_at' => $archivedAt,
+            'archive_reason' => $archiveReason,
+            'archived_by' => $archivedBy,
+            'archive_approval_reference' => $approvalReference,
+            'archive_approved_by' => $approvedBy,
+            'archive_approved_at' => $archivedAt,
+            'updated_by' => $archivedBy,
         ]);
     }
 
@@ -192,11 +249,8 @@ class ParentProcurement extends BaseModel
     {
         $sql = 'SELECT *
                 FROM parent_procurement
-                WHERE is_archived = 0
-                  AND status <> :pending_status';
-        $params = [
-            'pending_status' => 'pending',
-        ];
+                WHERE 1 = 1';
+        $params = [];
 
         if ($search !== null && $search !== '') {
             $sql .= ' AND (procurement_title LIKE :search OR reference_number LIKE :search OR description LIKE :search)';
@@ -220,6 +274,24 @@ class ParentProcurement extends BaseModel
         return $statement->fetchAll() ?: [];
     }
 
+    public function findByReferenceNumber(string $referenceNumber): ?array
+    {
+        $statement = $this->connection()->prepare(
+            'SELECT p.*,
+                    creator.username AS creator_username,
+                    creator.firstname AS creator_firstname,
+                    creator.lastname AS creator_lastname
+             FROM parent_procurement p
+             INNER JOIN users creator ON creator.id = p.created_by
+             WHERE p.reference_number = :reference_number
+             LIMIT 1'
+        );
+
+        $statement->execute(['reference_number' => $referenceNumber]);
+
+        return $statement->fetch() ?: null;
+    }
+
     public function referenceNumberExists(string $referenceNumber, ?int $ignoreId = null): bool
     {
         $sql = 'SELECT COUNT(*) FROM parent_procurement WHERE reference_number = :reference_number';
@@ -232,6 +304,21 @@ class ParentProcurement extends BaseModel
 
         $statement = $this->connection()->prepare($sql);
         $statement->execute($params);
+
+        return (int) $statement->fetchColumn() > 0;
+    }
+
+    public function hasAnyOwnershipReferences(int $userId): bool
+    {
+        $statement = $this->connection()->prepare(
+            'SELECT COUNT(*)
+             FROM parent_procurement
+             WHERE created_by = :user_id
+                OR updated_by = :user_id
+                OR archived_by = :user_id
+                OR archive_approved_by = :user_id'
+        );
+        $statement->execute(['user_id' => $userId]);
 
         return (int) $statement->fetchColumn() > 0;
     }

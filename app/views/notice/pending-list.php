@@ -4,11 +4,27 @@ use App\Helpers\ProcurementTypeHelper;
 use App\Helpers\ResponseHelper;
 use App\Helpers\ViewHelper;
 use App\Models\ProcurementDocument;
+
+$postingStatusLabels = [
+    'scheduled' => 'Scheduled',
+    'open' => 'Open for Bids',
+    'closed' => 'Closed for Bids',
+    'archived' => 'Archived',
+];
+
+$workflowStageLabels = [
+    'bid_notice' => 'Bid Notice / Invitation to Bid',
+    'supplemental_bid_bulletin' => 'Supplemental/Bid Bulletin',
+    'resolution' => 'Resolution',
+    'award' => 'Notice of Award / Award',
+    'contract' => 'Contract',
+    'notice_to_proceed' => 'Notice to Proceed',
+];
 ?>
 <div class="page-head">
     <div>
         <h1>Procurement Postings</h1>
-        <p>Each project uses one procurement record, then all signed documents are posted in strict legal sequence under that record.</p>
+        <p>Each project uses one official public procurement record, then all signed documents are posted in strict legal sequence under that record.</p>
     </div>
 </div>
 
@@ -16,7 +32,7 @@ use App\Models\ProcurementDocument;
     <div class="page-head">
         <div>
             <h2>Actions</h2>
-            <p>Create the root record first, then add downstream posting documents as prerequisites become available.</p>
+            <p>Create the official bid notice first, then add downstream documents only when the legal prerequisite stage and chronology are satisfied.</p>
         </div>
     </div>
     <div class="action-row">
@@ -35,12 +51,12 @@ use App\Models\ProcurementDocument;
     <div class="card-section stack-sm">
         <div class="page-head">
             <div>
-                <h2>Pending</h2>
-                <p>Procurement postings whose Bid Notice is scheduled but not yet active.</p>
+                <h2>Scheduled</h2>
+                <p>Official public procurement postings whose opening date has not yet arrived.</p>
             </div>
         </div>
-        <?php if (empty($pendingNotices)): ?>
-            <p>No pending procurement postings.</p>
+        <?php if (empty($scheduledNotices)): ?>
+            <p>No scheduled procurement postings.</p>
         <?php else: ?>
             <div class="table-wrap">
                 <table>
@@ -54,7 +70,7 @@ use App\Models\ProcurementDocument;
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($pendingNotices as $notice): ?>
+                        <?php foreach ($scheduledNotices as $notice): ?>
                             <tr>
                                 <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
                                 <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
@@ -82,8 +98,8 @@ use App\Models\ProcurementDocument;
                     <tr>
                         <th>Title</th>
                         <th>Reference</th>
-                        <th>Status</th>
-                        <th>Current Stage</th>
+                        <th>Posting Status</th>
+                        <th>Workflow Stage</th>
                         <th>Region</th>
                         <th>Branch</th>
                         <th>Mode</th>
@@ -95,8 +111,9 @@ use App\Models\ProcurementDocument;
                         <tr>
                             <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
                             <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
-                            <td><span class="status-badge <?= ViewHelper::escape((string) ($notice['status'] ?? '')); ?>"><?= ViewHelper::escape($notice['status']); ?></span></td>
-                            <td><?= ViewHelper::escape(ucwords(str_replace('_', ' ', (string) ($notice['current_stage'] ?? 'draft')))); ?></td>
+                            <?php $postingStatus = (string) ($notice['posting_status'] ?? 'scheduled'); ?>
+                            <td><span class="status-badge <?= ViewHelper::escape($postingStatus); ?>"><?= ViewHelper::escape($postingStatusLabels[$postingStatus] ?? ucfirst($postingStatus)); ?></span></td>
+                            <td><?= ViewHelper::escape($workflowStageLabels[(string) ($notice['current_stage'] ?? 'bid_notice')] ?? ucwords(str_replace('_', ' ', (string) ($notice['current_stage'] ?? 'bid_notice')))); ?></td>
                             <td><?= ViewHelper::escape($notice['region']); ?></td>
                             <td><?= ViewHelper::escape($notice['branch'] ?? ''); ?></td>
                             <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $notice['mode_of_procurement'])); ?></td>
@@ -113,7 +130,7 @@ use App\Models\ProcurementDocument;
             <div class="page-head">
                 <div>
                     <h2>Archived</h2>
-                    <p>Retained only for compatibility. New postings in this module do not use archive actions.</p>
+                    <p>Archived records remain publicly traceable and read-only. Archiving is one-way and does not rewrite workflow stages or legal dates.</p>
                 </div>
             </div>
             <div class="table-wrap">

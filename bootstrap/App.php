@@ -4,6 +4,8 @@ namespace Bootstrap;
 
 use App\Helpers\LogHelper;
 use App\Helpers\ResponseHelper;
+use Bootstrap\Database;
+use Bootstrap\SchemaIntegrityGuard;
 use RuntimeException;
 use Throwable;
 
@@ -25,6 +27,7 @@ class App
     public function run(): void
     {
         try {
+            $this->assertSchemaIntegrity();
             $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
             $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
@@ -112,7 +115,20 @@ class App
             return;
         }
 
+        if ($throwable instanceof RuntimeException && str_contains($message, 'Schema integrity check failed:')) {
+            $this->renderSchemaIntegrityError($message);
+            return;
+        }
+
         ResponseHelper::abort(500, 'An unexpected error occurred. Please try again later.');
+    }
+
+    private function assertSchemaIntegrity(): void
+    {
+        SchemaIntegrityGuard::assertValid(
+            Database::connection(),
+            (string) $this->config('database.database', 'bps')
+        );
     }
 
     private function renderDatabaseSetupError(string $message): void
@@ -143,6 +159,23 @@ class App
             echo '<pre>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</pre>';
         }
 
+        echo '</div></body></html>';
+    }
+
+    private function renderSchemaIntegrityError(string $message): void
+    {
+        http_response_code(500);
+
+        $schemaPath = dirname(__DIR__) . '/database/schema.sql';
+        $dbName = (string) $this->config('database.database', 'bps');
+
+        echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Schema Validation Failed</title><style>body{font-family:Segoe UI,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:32px}.panel{max-width:900px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 12px 30px rgba(15,23,42,.08)}code,pre{background:#f1f5f9;border-radius:8px;padding:2px 6px}pre{padding:14px;overflow:auto}h1{margin-top:0}</style></head><body><div class="panel">';
+        echo '<h1>Schema Validation Failed</h1>';
+        echo '<p>The application refused to start because the database schema does not match the government-procurement-safe structure required by this build.</p>';
+        echo '<p><strong>Database:</strong> ' . htmlspecialchars($dbName, ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '<p><strong>Expected schema file:</strong> ' . htmlspecialchars($schemaPath, ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '<p><strong>Validation error:</strong></p>';
+        echo '<pre>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</pre>';
         echo '</div></body></html>';
     }
 }

@@ -44,4 +44,25 @@ class FileUploadService extends BaseService
             unlink($absolutePath);
         }
     }
+
+    public function absolutePath(string $relativePath): string
+    {
+        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+    }
+
+    public function hash(string $relativePath): string
+    {
+        $absolutePath = $this->absolutePath($relativePath);
+
+        if (!is_file($absolutePath)) {
+            throw new \RuntimeException('Stored PDF file was not found for hashing.');
+        }
+
+        $hash = hash_file('sha256', $absolutePath);
+        if (!is_string($hash) || $hash === '') {
+            throw new \RuntimeException('Unable to compute PDF hash.');
+        }
+
+        return $hash;
+    }
 }

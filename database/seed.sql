@@ -2,11 +2,17 @@ USE `bps`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE `email_change_requests`;
-TRUNCATE TABLE `notices`;
+TRUNCATE TABLE `procurement_activity_logs`;
+TRUNCATE TABLE `notices_to_proceed`;
+TRUNCATE TABLE `contracts`;
+TRUNCATE TABLE `awards`;
+TRUNCATE TABLE `resolutions`;
+TRUNCATE TABLE `supplemental_bid_bulletins`;
+TRUNCATE TABLE `bid_notices`;
+TRUNCATE TABLE `parent_procurement`;
 TRUNCATE TABLE `users`;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- Password for all seeded users: Password123!
 INSERT INTO `users` (
     `id`,
     `username`,
@@ -18,513 +24,46 @@ INSERT INTO `users` (
     `password`,
     `role`,
     `email`,
-    `verification_token`,
     `verification_code`,
     `token_expiry`,
     `is_verified`,
-    `is_active`,
-    `created_at`,
-    `updated_at`
+    `is_active`
 ) VALUES
-    (
-        1,
-        'admin.ncr',
-        'Alicia',
-        'M',
-        'Reyes',
-        'NCR',
-        'NCR',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'admin',
-        'admin.ncr@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        1,
-        NOW(),
-        NOW()
-    ),
-    (
-        2,
-        'admin.region4',
-        'Benjamin',
-        'L',
-        'Cruz',
-        'Region IV',
-        'Laguna Branch',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'admin',
-        'admin.region4@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        1,
-        NOW(),
-        NOW()
-    ),
-    (
-        3,
-        'author.ncr.central',
-        'Carla',
-        'S',
-        'Dizon',
-        'NCR',
-        'Central District',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'author',
-        'author.ncr.central@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        1,
-        NOW(),
-        NOW()
-    ),
-    (
-        4,
-        'author.region4.laguna',
-        'Daniel',
-        'P',
-        'Santos',
-        'Region IV',
-        'Laguna Branch',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'author',
-        'author.region4.laguna@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        1,
-        NOW(),
-        NOW()
-    ),
-    (
-        5,
-        'author.region7.cebu',
-        'Elena',
-        'R',
-        'Garcia',
-        'Region VII',
-        'Cebu Branch',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'author',
-        'author.region7.cebu@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        1,
-        NOW(),
-        NOW()
-    ),
-    (
-        6,
-        'author.region1.union',
-        'Francis',
-        'T',
-        'Mendoza',
-        'Region I',
-        'La Union Branch',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'author',
-        'author.region1.union@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        1,
-        NOW(),
-        NOW()
-    ),
-    (
-        7,
-        'pending.region3',
-        'Grace',
-        'N',
-        'Flores',
-        'Region III',
-        'Bulacan Branch',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'author',
-        'pending.region3@agency.gov.ph',
-        NULL,
-        '654321',
-        DATE_ADD(NOW(), INTERVAL 15 MINUTE),
-        0,
-        0,
-        NOW(),
-        NOW()
-    ),
-    (
-        8,
-        'inactive.caraga',
-        'Henry',
-        'Q',
-        'Aquino',
-        'CARAGA',
-        'CARAGA',
-        '$2y$10$eiQoNjPX8lM109hwGGlmdeV.eBCnWLC.AjcNKCAlCSOrjP8rvLmR.',
-        'author',
-        'inactive.caraga@agency.gov.ph',
-        NULL,
-        NULL,
-        NULL,
-        1,
-        0,
-        NOW(),
-        NOW()
-    );
-
--- Active workflow set in NCR with full notice chain.
-INSERT INTO `notices` (
-    `id`,
-    `title`,
-    `reference_code`,
-    `type`,
-    `file_path`,
-    `upload_date`,
-    `start_date`,
-    `end_date`,
-    `uploaded_by`,
-    `description`,
-    `is_archived`,
-    `status`,
-    `region`,
-    `branch`,
-    `procurement_type`,
-    `archived_at`
-) VALUES
-    (
-        1001,
-        'National ICT Infrastructure Upgrade 2026',
-        'BPS-2026-001',
-        'bid',
-        'storage/uploads/notices/sample-bid-001.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 5 DAY),
-        DATE_ADD(NOW(), INTERVAL 20 DAY),
-        3,
-        'Active NCR bid notice used for public listing, workflow validation, and related notice creation.',
-        0,
-        'active',
-        'NCR',
-        'Central District',
-        'competitive_bidding',
-        NULL
-    ),
-    (
-        1002,
-        'Supplemental Bid Bulletin for ICT Infrastructure Upgrade',
-        'BPS-2026-001',
-        'sbb',
-        'storage/uploads/notices/sample-sbb-001.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 4 DAY),
-        DATE_ADD(NOW(), INTERVAL 18 DAY),
-        3,
-        'Clarifications and amendments for the active ICT bidding opportunity.',
-        0,
-        'active',
-        'NCR',
-        'Central District',
-        'competitive_bidding',
-        NULL
-    ),
-    (
-        1003,
-        'BAC Resolution for ICT Infrastructure Upgrade',
-        'BPS-2026-001',
-        'resolution',
-        'storage/uploads/notices/sample-resolution-001.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 3 DAY),
-        DATE_ADD(NOW(), INTERVAL 17 DAY),
-        3,
-        'Resolution attached to the active workflow set.',
-        0,
-        'active',
-        'NCR',
-        'Central District',
-        'competitive_bidding',
-        NULL
-    ),
-    (
-        1004,
-        'Notice of Award for ICT Infrastructure Upgrade',
-        'BPS-2026-001',
-        'award',
-        'storage/uploads/notices/sample-award-001.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 2 DAY),
-        DATE_ADD(NOW(), INTERVAL 16 DAY),
-        3,
-        'Award notice within the active workflow set.',
-        0,
-        'active',
-        'NCR',
-        'Central District',
-        'competitive_bidding',
-        NULL
-    ),
-    (
-        1005,
-        'Contract for ICT Infrastructure Upgrade',
-        'BPS-2026-001',
-        'contract',
-        'storage/uploads/notices/sample-contract-001.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 1 DAY),
-        DATE_ADD(NOW(), INTERVAL 15 DAY),
-        3,
-        'Contract notice within the active workflow set.',
-        0,
-        'active',
-        'NCR',
-        'Central District',
-        'competitive_bidding',
-        NULL
-    ),
-    (
-        1006,
-        'Notice to Proceed for ICT Infrastructure Upgrade',
-        'BPS-2026-001',
-        'proceed',
-        'storage/uploads/notices/sample-proceed-001.pdf',
-        NOW(),
-        NOW(),
-        DATE_ADD(NOW(), INTERVAL 14 DAY),
-        3,
-        'Proceed notice to complete the active procurement workflow.',
-        0,
-        'active',
-        'NCR',
-        'Central District',
-        'competitive_bidding',
-        NULL
-    );
-
--- Pending notices for editing and owner permissions.
-INSERT INTO `notices` (
-    `id`,
-    `title`,
-    `reference_code`,
-    `type`,
-    `file_path`,
-    `upload_date`,
-    `start_date`,
-    `end_date`,
-    `uploaded_by`,
-    `description`,
-    `is_archived`,
-    `status`,
-    `region`,
-    `branch`,
-    `procurement_type`,
-    `archived_at`
-) VALUES
-    (
-        1101,
-        'Laguna Branch Office Renovation 2026',
-        'BPS-2026-010',
-        'bid',
-        'storage/uploads/notices/sample-bid-002.pdf',
-        NOW(),
-        DATE_ADD(NOW(), INTERVAL 5 DAY),
-        DATE_ADD(NOW(), INTERVAL 25 DAY),
-        4,
-        'Pending Region IV notice reserved for edit and delete testing.',
-        0,
-        'pending',
-        'Region IV',
-        'Laguna Branch',
-        'small_value_procurement',
-        NULL
-    ),
-    (
-        1102,
-        'Cebu Warehouse Security Services 2026',
-        'BPS-2026-011',
-        'bid',
-        'storage/uploads/notices/sample-bid-005.pdf',
-        NOW(),
-        DATE_ADD(NOW(), INTERVAL 2 DAY),
-        DATE_ADD(NOW(), INTERVAL 18 DAY),
-        5,
-        'Pending Region VII notice using negotiated procurement.',
-        0,
-        'pending',
-        'Region VII',
-        'Cebu Branch',
-        'negotiated_procurement',
-        NULL
-    );
-
--- Expired workflow set for archive-by-expiration checks.
-INSERT INTO `notices` (
-    `id`,
-    `title`,
-    `reference_code`,
-    `type`,
-    `file_path`,
-    `upload_date`,
-    `start_date`,
-    `end_date`,
-    `uploaded_by`,
-    `description`,
-    `is_archived`,
-    `status`,
-    `region`,
-    `branch`,
-    `procurement_type`,
-    `archived_at`
-) VALUES
-    (
-        1201,
-        'Region I Grain Storage Expansion 2025',
-        'BPS-2025-020',
-        'bid',
-        'storage/uploads/notices/sample-bid-003.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 50 DAY),
-        DATE_SUB(NOW(), INTERVAL 15 DAY),
-        6,
-        'Expired Region I bid notice retained to test historical and archival behaviors.',
-        0,
-        'expired',
-        'Region I',
-        'La Union Branch',
-        'direct_acquisition',
-        NULL
-    ),
-    (
-        1202,
-        'Resolution for Grain Storage Expansion',
-        'BPS-2025-020',
-        'resolution',
-        'storage/uploads/notices/sample-resolution-003.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 48 DAY),
-        DATE_SUB(NOW(), INTERVAL 14 DAY),
-        6,
-        'Expired resolution record related to the Region I workflow set.',
-        0,
-        'expired',
-        'Region I',
-        'La Union Branch',
-        'direct_acquisition',
-        NULL
-    );
-
--- Archived workflow set for restore testing.
-INSERT INTO `notices` (
-    `id`,
-    `title`,
-    `reference_code`,
-    `type`,
-    `file_path`,
-    `upload_date`,
-    `start_date`,
-    `end_date`,
-    `uploaded_by`,
-    `description`,
-    `is_archived`,
-    `status`,
-    `region`,
-    `branch`,
-    `procurement_type`,
-    `archived_at`
-) VALUES
-    (
-        1301,
-        'Regional Fleet Maintenance Services 2025',
-        'BPS-2025-030',
-        'bid',
-        'storage/uploads/notices/sample-bid-004.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 40 DAY),
-        DATE_ADD(NOW(), INTERVAL 10 DAY),
-        2,
-        'Archived bid notice used to verify grouped archive and unarchive actions.',
-        1,
-        'archived',
-        'Region IV',
-        'Laguna Branch',
-        'repeat_order',
-        DATE_SUB(NOW(), INTERVAL 3 DAY)
-    ),
-    (
-        1302,
-        'Resolution for Fleet Maintenance Services',
-        'BPS-2025-030',
-        'resolution',
-        'storage/uploads/notices/sample-resolution-004.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 38 DAY),
-        DATE_ADD(NOW(), INTERVAL 9 DAY),
-        2,
-        'Archived resolution attached to the fleet maintenance workflow.',
-        1,
-        'archived',
-        'Region IV',
-        'Laguna Branch',
-        'repeat_order',
-        DATE_SUB(NOW(), INTERVAL 3 DAY)
-    ),
-    (
-        1303,
-        'Award for Fleet Maintenance Services',
-        'BPS-2025-030',
-        'award',
-        'storage/uploads/notices/sample-award-004.pdf',
-        NOW(),
-        DATE_SUB(NOW(), INTERVAL 36 DAY),
-        DATE_ADD(NOW(), INTERVAL 8 DAY),
-        2,
-        'Archived award document attached to the fleet maintenance workflow.',
-        1,
-        'archived',
-        'Region IV',
-        'Laguna Branch',
-        'repeat_order',
-        DATE_SUB(NOW(), INTERVAL 3 DAY)
-    );
-
-INSERT INTO `email_change_requests` (
-    `id`,
-    `user_id`,
-    `current_email`,
-    `new_email`,
-    `token`,
-    `status`,
-    `created_at`,
-    `expires_at`
-) VALUES
-    (
-        2001,
-        3,
-        'author.ncr.central@agency.gov.ph',
-        'author.ncr.central.updated@agency.gov.ph',
-        'seed-email-change-token-101',
-        'pending',
-        NOW(),
-        DATE_ADD(NOW(), INTERVAL 1 DAY)
-    ),
-    (
-        2002,
-        4,
-        'author.region4.laguna@agency.gov.ph',
-        'author.region4.laguna.completed@agency.gov.ph',
-        'seed-email-change-token-102',
-        'completed',
-        NOW(),
-        DATE_SUB(DATE_ADD(NOW(), INTERVAL 1 DAY), INTERVAL 12 HOUR)
-    );
+(
+    1,
+    'secretariat1',
+    'Secretariat',
+    'A',
+    'Officer',
+    'Central Office',
+    'Administrative and General Services Department',
+    '$2y$10$xU0mMJ/okV9cheDamfxGfumXclp/JZHPCTEKLgNIICq2VT0HJpiBG',
+    'author',
+    'secretariat.officer@nfa.gov.ph',
+    NULL,
+    NULL,
+    1,
+    1
+),
+(
+    2,
+    'sysadmin',
+    'System',
+    NULL,
+    'Administrator',
+    'Central Office',
+    'Administrative and General Services Department',
+    '$2y$10$XgllwcfsWZj7qOq5SghaF.N7AanuAVD4ex/YhdZFNa2inp5I4./6y',
+    'admin',
+    'system.admin@nfa.gov.ph',
+    NULL,
+    NULL,
+    1,
+    1
+);
 
 INSERT INTO `parent_procurement` (
+    `id`,
     `reference_number`,
     `procurement_title`,
     `abc`,
@@ -532,164 +71,384 @@ INSERT INTO `parent_procurement` (
     `posting_date`,
     `bid_submission_deadline`,
     `description`,
-    `status`,
+    `posting_status`,
     `current_stage`,
-    `is_archived`,
     `archived_at`,
+    `archive_reason`,
+    `archived_by`,
+    `archive_approval_reference`,
+    `archive_approved_by`,
+    `archive_approved_at`,
     `region`,
     `branch`,
     `created_by`,
-    `updated_by`,
-    `created_at`,
-    `updated_at`
-)
-SELECT
-    n.`reference_code`,
-    n.`title`,
-    0.00,
-    n.`procurement_type`,
-    n.`start_date`,
-    n.`end_date`,
-    n.`description`,
-    n.`status`,
-    CASE
-        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN 'notice_to_proceed'
-        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'contract') THEN 'contract'
-        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'award') THEN 'award'
-        WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') THEN 'resolution'
-        ELSE 'bid_notice'
-    END,
-    n.`is_archived`,
-    n.`archived_at`,
-    n.`region`,
-    n.`branch`,
-    n.`uploaded_by`,
-    n.`uploaded_by`,
-    n.`upload_date`,
-    n.`upload_date`
-FROM `notices` n
-WHERE n.`type` = 'bid';
+    `updated_by`
+) VALUES
+(
+    1,
+    'BAC-2026-0401',
+    'Procurement of Property Information System',
+    12000000.00,
+    'competitive_bidding',
+    '2026-04-20 09:00:00',
+    '2026-05-02 09:00:00',
+    'Official public procurement posting for the Property Information System.',
+    'scheduled',
+    'bid_notice',
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    'Central Office',
+    'Administrative and General Services Department',
+    1,
+    1
+),
+(
+    2,
+    'BAC-2026-0402',
+    'Procurement of Human Resource Information System',
+    14000000.00,
+    'competitive_bidding',
+    '2026-04-01 09:00:00',
+    '2026-04-15 09:00:00',
+    'Official public procurement posting for the Human Resource Information System.',
+    'closed',
+    'notice_to_proceed',
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    'Central Office',
+    'Administrative and General Services Department',
+    1,
+    1
+),
+(
+    3,
+    'BAC-2026-0403',
+    'Procurement of Financial Management Information System',
+    16000000.00,
+    'competitive_bidding',
+    '2026-03-01 09:00:00',
+    '2026-03-18 09:00:00',
+    'Official public procurement posting for the Financial Management Information System.',
+    'archived',
+    'notice_to_proceed',
+    '2026-04-05 10:00:00',
+    'Lifecycle completed and archived for records retention.',
+    2,
+    'ADM-ARCH-2026-001',
+    2,
+    '2026-04-05 10:00:00',
+    'Central Office',
+    'Administrative and General Services Department',
+    1,
+    2
+);
 
 INSERT INTO `bid_notices` (
+    `id`,
     `parent_procurement_id`,
     `title`,
     `description`,
     `file_path`,
+    `file_hash`,
     `document_type`,
     `sequence_stage`,
     `posted_at`,
-    `is_locked`,
-    `locked_at`,
-    `lock_reason`,
-    `is_reopened`,
-    `reopened_at`,
-    `reopened_by`,
     `created_by`,
-    `updated_by`,
-    `created_at`,
-    `updated_at`
-)
-SELECT
-    p.`id`,
-    n.`title`,
-    n.`description`,
-    n.`file_path`,
+    `updated_by`
+) VALUES
+(
+    1,
+    1,
+    'Procurement of Property Information System',
+    'Official Bid Notice for the Property Information System.',
+    'storage/uploads/notices/sample-bid-001.pdf',
+    REPEAT('a', 64),
     'bid_notice',
     1,
-    n.`start_date`,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('resolution', 'award', 'contract', 'proceed')) THEN 1 ELSE 0 END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('resolution', 'award', 'contract', 'proceed')) THEN NOW() ELSE NULL END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('resolution', 'award', 'contract', 'proceed')) THEN 'Locked by seeded downstream posting.' ELSE NULL END,
-    0,
-    NULL,
-    NULL,
-    n.`uploaded_by`,
-    n.`uploaded_by`,
-    n.`upload_date`,
-    n.`upload_date`
-FROM `notices` n
-INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
-WHERE n.`type` = 'bid';
+    '2026-04-20 09:00:00',
+    1,
+    1
+),
+(
+    2,
+    2,
+    'Procurement of Human Resource Information System',
+    'Official Bid Notice for the Human Resource Information System.',
+    'storage/uploads/notices/sample-bid-002.pdf',
+    REPEAT('b', 64),
+    'bid_notice',
+    1,
+    '2026-04-01 09:00:00',
+    1,
+    1
+),
+(
+    3,
+    3,
+    'Procurement of Financial Management Information System',
+    'Official Bid Notice for the Financial Management Information System.',
+    'storage/uploads/notices/sample-bid-003.pdf',
+    REPEAT('c', 64),
+    'bid_notice',
+    1,
+    '2026-03-01 09:00:00',
+    1,
+    1
+);
 
 INSERT INTO `supplemental_bid_bulletins` (
+    `id`,
     `parent_procurement_id`,
     `title`,
     `description`,
     `file_path`,
+    `file_hash`,
     `document_type`,
     `sequence_stage`,
     `posted_at`,
-    `is_locked`,
-    `locked_at`,
-    `lock_reason`,
-    `is_reopened`,
-    `reopened_at`,
-    `reopened_by`,
     `created_by`,
-    `updated_by`,
-    `created_at`,
-    `updated_at`
-)
-SELECT
-    p.`id`,
-    n.`title`,
-    n.`description`,
-    n.`file_path`,
+    `updated_by`
+) VALUES
+(
+    1,
+    2,
+    'HRIS Supplemental/Bid Bulletin No. 1',
+    'Clarification bulletin issued before the bid deadline.',
+    'storage/uploads/notices/sample-sbb-001.pdf',
+    REPEAT('d', 64),
     'supplemental_bid_bulletin',
     2,
-    n.`start_date`,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') OR n.`end_date` < NOW() THEN 1 ELSE 0 END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') OR n.`end_date` < NOW() THEN NOW() ELSE NULL END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'resolution') THEN 'Locked after seeded resolution posting.' WHEN n.`end_date` < NOW() THEN 'Locked after bid submission deadline.' ELSE NULL END,
-    0,
+    '2026-04-10 13:00:00',
+    1,
+    1
+),
+(
+    2,
+    3,
+    'FMIS Supplemental/Bid Bulletin No. 1',
+    'Clarification bulletin issued before the bid deadline.',
+    'storage/uploads/notices/sample-sbb-002.pdf',
+    REPEAT('e', 64),
+    'supplemental_bid_bulletin',
+    2,
+    '2026-03-10 13:00:00',
+    1,
+    1
+);
+
+INSERT INTO `resolutions` (
+    `id`,
+    `parent_procurement_id`,
+    `title`,
+    `description`,
+    `file_path`,
+    `file_hash`,
+    `document_type`,
+    `sequence_stage`,
+    `posted_at`,
+    `created_by`,
+    `updated_by`
+) VALUES
+(
+    1,
+    2,
+    'BAC Resolution for HRIS',
+    'Resolution issued after bid closing.',
+    'storage/uploads/notices/sample-resolution-001.pdf',
+    REPEAT('f', 64),
+    'resolution',
+    3,
+    '2026-04-16 10:00:00',
+    1,
+    1
+),
+(
+    2,
+    3,
+    'BAC Resolution for FMIS',
+    'Resolution issued after bid closing.',
+    'storage/uploads/notices/sample-resolution-002.pdf',
+    REPEAT('1', 64),
+    'resolution',
+    3,
+    '2026-03-19 10:00:00',
+    1,
+    1
+);
+
+INSERT INTO `awards` (
+    `id`,
+    `parent_procurement_id`,
+    `title`,
+    `description`,
+    `file_path`,
+    `file_hash`,
+    `document_type`,
+    `sequence_stage`,
+    `posted_at`,
+    `created_by`,
+    `updated_by`
+) VALUES
+(
+    1,
+    2,
+    'Notice of Award for HRIS',
+    'Award issued after the resolution.',
+    'storage/uploads/notices/sample-award-001.pdf',
+    REPEAT('2', 64),
+    'award',
+    4,
+    '2026-04-17 09:00:00',
+    1,
+    1
+),
+(
+    2,
+    3,
+    'Notice of Award for FMIS',
+    'Award issued after the resolution.',
+    'storage/uploads/notices/sample-award-002.pdf',
+    REPEAT('3', 64),
+    'award',
+    4,
+    '2026-03-20 09:00:00',
+    1,
+    1
+);
+
+INSERT INTO `contracts` (
+    `id`,
+    `parent_procurement_id`,
+    `title`,
+    `description`,
+    `file_path`,
+    `file_hash`,
+    `document_type`,
+    `sequence_stage`,
+    `posted_at`,
+    `created_by`,
+    `updated_by`
+) VALUES
+(
+    1,
+    2,
+    'Contract for HRIS',
+    'Contract issued after award.',
+    'storage/uploads/notices/sample-contract-001.pdf',
+    REPEAT('4', 64),
+    'contract',
+    5,
+    '2026-04-18 15:00:00',
+    1,
+    1
+),
+(
+    2,
+    3,
+    'Contract for FMIS',
+    'Contract issued after award.',
+    'storage/uploads/notices/sample-contract-002.pdf',
+    REPEAT('5', 64),
+    'contract',
+    5,
+    '2026-03-22 15:00:00',
+    1,
+    1
+);
+
+INSERT INTO `notices_to_proceed` (
+    `id`,
+    `parent_procurement_id`,
+    `title`,
+    `description`,
+    `file_path`,
+    `file_hash`,
+    `document_type`,
+    `sequence_stage`,
+    `posted_at`,
+    `created_by`,
+    `updated_by`
+) VALUES
+(
+    1,
+    2,
+    'Notice to Proceed for HRIS',
+    'Notice to Proceed issued after contract execution.',
+    'storage/uploads/notices/sample-ntp-001.pdf',
+    REPEAT('6', 64),
+    'notice_to_proceed',
+    6,
+    '2026-04-21 08:00:00',
+    1,
+    1
+),
+(
+    2,
+    3,
+    'Notice to Proceed for FMIS',
+    'Notice to Proceed issued after contract execution.',
+    'storage/uploads/notices/sample-ntp-002.pdf',
+    REPEAT('7', 64),
+    'notice_to_proceed',
+    6,
+    '2026-03-24 08:00:00',
+    1,
+    1
+);
+
+INSERT INTO `procurement_activity_logs` (
+    `parent_procurement_id`,
+    `user_id`,
+    `action_type`,
+    `document_type`,
+    `document_id`,
+    `before_snapshot`,
+    `after_snapshot`,
+    `reason`,
+    `file_hash`,
+    `approval_reference`
+) VALUES
+(
+    1,
+    1,
+    'create_parent',
+    'bid_notice',
+    1,
     NULL,
+    JSON_OBJECT('reference_number', 'BAC-2026-0401', 'posting_status', 'scheduled'),
+    'Official public procurement posting created.',
+    REPEAT('a', 64),
+    NULL
+),
+(
+    2,
+    1,
+    'create_document',
+    'notice_to_proceed',
+    1,
     NULL,
-    n.`uploaded_by`,
-    n.`uploaded_by`,
-    n.`upload_date`,
-    n.`upload_date`
-FROM `notices` n
-INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
-WHERE n.`type` = 'sbb';
-
-INSERT INTO `resolutions` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
-SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'resolution', 3, n.`start_date`,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('award', 'contract', 'proceed')) THEN 1 ELSE 0 END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('award', 'contract', 'proceed')) THEN NOW() ELSE NULL END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('award', 'contract', 'proceed')) THEN 'Locked by seeded downstream posting.' ELSE NULL END,
-    0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
-FROM `notices` n
-INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
-WHERE n.`type` = 'resolution';
-
-INSERT INTO `awards` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
-SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'award', 4, n.`start_date`,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('contract', 'proceed')) THEN 1 ELSE 0 END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('contract', 'proceed')) THEN NOW() ELSE NULL END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` IN ('contract', 'proceed')) THEN 'Locked by seeded downstream posting.' ELSE NULL END,
-    0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
-FROM `notices` n
-INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
-WHERE n.`type` = 'award';
-
-INSERT INTO `contracts` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
-SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'contract', 5, n.`start_date`,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN 1 ELSE 0 END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN NOW() ELSE NULL END,
-    CASE WHEN EXISTS (SELECT 1 FROM `notices` nx WHERE nx.`reference_code` = n.`reference_code` AND nx.`type` = 'proceed') THEN 'Locked by seeded notice to proceed.' ELSE NULL END,
-    0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
-FROM `notices` n
-INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
-WHERE n.`type` = 'contract';
-
-INSERT INTO `notices_to_proceed` (`parent_procurement_id`, `title`, `description`, `file_path`, `document_type`, `sequence_stage`, `posted_at`, `is_locked`, `locked_at`, `lock_reason`, `is_reopened`, `reopened_at`, `reopened_by`, `created_by`, `updated_by`, `created_at`, `updated_at`)
-SELECT p.`id`, n.`title`, n.`description`, n.`file_path`, 'notice_to_proceed', 6, n.`start_date`,
-    0, NULL, NULL, 0, NULL, NULL, n.`uploaded_by`, n.`uploaded_by`, n.`upload_date`, n.`upload_date`
-FROM `notices` n
-INNER JOIN `parent_procurement` p ON p.`reference_number` = n.`reference_code`
-WHERE n.`type` = 'proceed';
-
-INSERT INTO `procurement_activity_logs` (`parent_procurement_id`, `document_type`, `document_id`, `sequence_stage`, `action_type`, `acted_by`, `action_note`, `created_at`)
-SELECT p.`id`, 'bid_notice', b.`id`, 1, 'create', b.`created_by`, 'Seeded bid notice activity.', b.`created_at`
-FROM `bid_notices` b
-INNER JOIN `parent_procurement` p ON p.`id` = b.`parent_procurement_id`;
+    JSON_OBJECT('document_type', 'notice_to_proceed', 'posted_at', '2026-04-21 08:00:00'),
+    'Official signed procurement document posted.',
+    REPEAT('6', 64),
+    NULL
+),
+(
+    3,
+    2,
+    'archive',
+    'notice_to_proceed',
+    NULL,
+    JSON_OBJECT('posting_status', 'closed'),
+    JSON_OBJECT('posting_status', 'archived', 'archive_reason', 'Lifecycle completed and archived for records retention.'),
+    'Lifecycle completed and archived for records retention.',
+    NULL,
+    'ADM-ARCH-2026-001'
+);

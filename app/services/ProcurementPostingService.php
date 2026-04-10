@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Helpers\LogHelper;
 use App\Helpers\ProcurementTypeHelper;
 use App\Helpers\ValidationHelper;
 use App\Models\ParentProcurement;
@@ -12,10 +11,16 @@ use DateTimeImmutable;
 
 class ProcurementPostingService extends BaseService
 {
+    public const POSTING_STATUS_SCHEDULED = 'scheduled';
+    public const POSTING_STATUS_OPEN = 'open';
+    public const POSTING_STATUS_CLOSED = 'closed';
+    public const POSTING_STATUS_ARCHIVED = 'archived';
+
     public function __construct(
         private readonly ?ParentProcurement $parents = null,
         private readonly ?ProcurementDocument $documents = null,
-        private readonly ?ProcurementActivityLog $activityLogs = null
+        private readonly ?ProcurementActivityLog $activityLogs = null,
+        private readonly ?FileUploadService $uploads = null
     ) {
     }
 
@@ -91,9 +96,9 @@ class ProcurementPostingService extends BaseService
     {
         $data = [
             'type' => trim((string) ($input['type'] ?? '')),
-            'parent_procurement_id' => (int) ($input['parent_procurement_id'] ?? $input['selected_bid_id'] ?? $input['bid_id'] ?? 0),
+            'parent_procurement_id' => (int) ($input['parent_procurement_id'] ?? 0),
             'title' => trim((string) ($input['title'] ?? '')),
-            'posted_at' => trim((string) ($input['posted_at'] ?? $input['start_date'] ?? '')),
+            'posted_at' => trim((string) ($input['posted_at'] ?? '')),
             'description' => trim((string) ($input['description'] ?? '')),
         ];
         $errors = [];
@@ -122,43 +127,43 @@ class ProcurementPostingService extends BaseService
         ];
     }
 
-    public function determineParentStatus(array $parent): string
+    public function determinePostingStatus(array $parent, ?DateTimeImmutable $now = null): string
     {
-        if ((int) ($parent['is_archived'] ?? 0) === 1) {
-            return 'archived';
+        if (!empty($parent['archived_at'])) {
+            return self::POSTING_STATUS_ARCHIVED;
         }
 
-        $now = new DateTimeImmutable();
+        $now ??= new DateTimeImmutable();
         $postingDate = new DateTimeImmutable((string) $parent['posting_date']);
         $deadline = new DateTimeImmutable((string) $parent['bid_submission_deadline']);
-        $currentStage = (string) ($parent['current_stage'] ?? 'draft');
+
+        if ($deadline < $now) {
+            return self::POSTING_STATUS_CLOSED;
+        }
 
         if ($postingDate > $now) {
-            return 'pending';
+            return self::POSTING_STATUS_SCHEDULED;
         }
 
-        if ($deadline < $now && in_array($currentStage, ['draft', 'bid_notice'], true)) {
-            return 'expired';
-        }
-
-        return 'active';
+        return self::POSTING_STATUS_OPEN;
     }
 
-    public function currentStage(array $parent, array $documentsByType): string
+    public function currentStage(array $documentsByType): string
     {
         foreach ([
             ProcurementDocument::TYPE_NOTICE_TO_PROCEED,
             ProcurementDocument::TYPE_CONTRACT,
             ProcurementDocument::TYPE_AWARD,
             ProcurementDocument::TYPE_RESOLUTION,
+            ProcurementDocument::TYPE_SBB,
             ProcurementDocument::TYPE_BID_NOTICE,
         ] as $type) {
             if (!empty($documentsByType[$type])) {
-                return $type === ProcurementDocument::TYPE_BID_NOTICE ? 'bid_notice' : $type;
+                return $type;
             }
         }
 
-        return 'draft';
+        return ProcurementDocument::TYPE_BID_NOTICE;
     }
 
     public function listForUser(array $user): array
@@ -224,12 +229,9 @@ class ProcurementPostingService extends BaseService
         $parentModel = $this->parents ?? new ParentProcurement();
         $documentModel = $this->documents ?? new ProcurementDocument();
         $activityLog = $this->activityLogs ?? new ProcurementActivityLog();
-        $status = $this->determineParentStatus([
-            'posting_date' => $data['posting_date'],
-            'bid_submission_deadline' => $data['bid_submission_deadline'],
-            'current_stage' => 'bid_notice',
-            'is_archived' => 0,
-        ]);
+        $uploads = $this->uploads ?? new FileUploadService();
+        $status = $this->determinePostingStatus($data);
+        $fileHash = $uploads->hash($filePath);
 
         $parentId = $parentModel->create([
             'reference_number' => $data['reference_number'],
@@ -239,10 +241,14 @@ class ProcurementPostingService extends BaseService
             'posting_date' => $data['posting_date'],
             'bid_submission_deadline' => $data['bid_submission_deadline'],
             'description' => $data['description'],
-            'status' => $status,
-            'current_stage' => 'bid_notice',
-            'is_archived' => 0,
+            'posting_status' => $status,
+            'current_stage' => ProcurementDocument::TYPE_BID_NOTICE,
             'archived_at' => null,
+            'archive_reason' => null,
+            'archived_by' => null,
+            'archive_approval_reference' => null,
+            'archive_approved_by' => null,
+            'archive_approved_at' => null,
             'region' => $user['region'],
             'branch' => $user['branch'] ?? null,
             'created_by' => $user['id'],
@@ -254,81 +260,27 @@ class ProcurementPostingService extends BaseService
             'title' => $data['procurement_title'],
             'description' => $data['description'],
             'file_path' => $filePath,
+            'file_hash' => $fileHash,
             'posted_at' => $data['posting_date'],
             'created_by' => $user['id'],
             'updated_by' => $user['id'],
         ]);
 
+        $parent = $parentModel->findById($parentId) ?? ['id' => $parentId];
         $activityLog->create([
             'parent_procurement_id' => $parentId,
+            'user_id' => $user['id'],
+            'action_type' => 'create_parent',
             'document_type' => ProcurementDocument::TYPE_BID_NOTICE,
             'document_id' => $documentId,
-            'sequence_stage' => ProcurementDocument::stageNumber(ProcurementDocument::TYPE_BID_NOTICE),
-            'action_type' => 'create',
-            'acted_by' => $user['id'],
-            'action_note' => 'Created the root bid notice posting record.',
+            'before_snapshot' => null,
+            'after_snapshot' => json_encode($parent, JSON_UNESCAPED_SLASHES),
+            'reason' => 'Official public procurement posting created.',
+            'file_hash' => $fileHash,
+            'approval_reference' => null,
         ]);
 
         return $parentId;
-    }
-
-    public function updateParent(int $parentId, array $data, array $user, ?string $filePath = null): array
-    {
-        $workflow = $this->findParentWithWorkflow($parentId);
-        if (!$workflow) {
-            return ['allowed' => false, 'errors' => ['Procurement record not found.']];
-        }
-
-        $parent = $workflow['parent'];
-        $bidNotice = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null;
-        if (!$bidNotice) {
-            return ['allowed' => false, 'errors' => ['Bid notice record is missing.']];
-        }
-
-        $guard = $this->canEditDocument(ProcurementDocument::TYPE_BID_NOTICE, $bidNotice, $parent, $workflow['documents'], $user);
-        if (!$guard['allowed']) {
-            return $guard;
-        }
-
-        ($this->parents ?? new ParentProcurement())->updateById($parentId, [
-            'reference_number' => $data['reference_number'],
-            'procurement_title' => $data['procurement_title'],
-            'abc' => $data['abc'],
-            'mode_of_procurement' => $data['mode_of_procurement'],
-            'posting_date' => $data['posting_date'],
-            'bid_submission_deadline' => $data['bid_submission_deadline'],
-            'description' => $data['description'],
-            'status' => $this->determineParentStatus(array_merge($parent, [
-                'posting_date' => $data['posting_date'],
-                'bid_submission_deadline' => $data['bid_submission_deadline'],
-            ])),
-            'current_stage' => $parent['current_stage'],
-            'is_archived' => $parent['is_archived'],
-            'archived_at' => $parent['archived_at'] ?? null,
-            'region' => $parent['region'],
-            'branch' => $parent['branch'] ?? null,
-            'updated_by' => $user['id'],
-        ]);
-
-        ($this->documents ?? new ProcurementDocument())->updateById(ProcurementDocument::TYPE_BID_NOTICE, (int) $bidNotice['id'], [
-            'title' => $data['procurement_title'],
-            'description' => $data['description'],
-            'file_path' => $filePath ?? $bidNotice['file_path'],
-            'posted_at' => $data['posting_date'],
-            'updated_by' => $user['id'],
-        ]);
-
-        ($this->activityLogs ?? new ProcurementActivityLog())->create([
-            'parent_procurement_id' => $parentId,
-            'document_type' => ProcurementDocument::TYPE_BID_NOTICE,
-            'document_id' => $bidNotice['id'],
-            'sequence_stage' => ProcurementDocument::stageNumber(ProcurementDocument::TYPE_BID_NOTICE),
-            'action_type' => 'edit',
-            'acted_by' => $user['id'],
-            'action_note' => 'Edited the bid notice record.',
-        ]);
-
-        return ['allowed' => true, 'errors' => []];
     }
 
     public function createDocument(string $type, int $parentId, array $data, array $user, string $filePath): array
@@ -346,45 +298,38 @@ class ProcurementPostingService extends BaseService
             return ['allowed' => false, 'errors' => ['You may only post documents to procurement records assigned to your branch.']];
         }
 
-        // This module is strictly for posting already approved offline documents.
-        // We only enforce posting order and posting-time eligibility here, not approvals or signatures.
-        $guard = $this->canCreateDocument($type, $parent, $workflow['documents']);
+        $guard = $this->canCreateDocument($type, $parent, $workflow['documents'], $data['posted_at']);
         if (!$guard['allowed']) {
             return $guard;
         }
+
+        $uploads = $this->uploads ?? new FileUploadService();
+        $fileHash = $uploads->hash($filePath);
 
         $documentId = ($this->documents ?? new ProcurementDocument())->create($type, [
             'parent_procurement_id' => $parentId,
             'title' => $data['title'],
             'description' => $data['description'],
             'file_path' => $filePath,
+            'file_hash' => $fileHash,
             'posted_at' => $data['posted_at'],
             'created_by' => $user['id'],
             'updated_by' => $user['id'],
         ]);
 
+        $document = ($this->documents ?? new ProcurementDocument())->findById($type, $documentId) ?? ['id' => $documentId];
         ($this->activityLogs ?? new ProcurementActivityLog())->create([
             'parent_procurement_id' => $parentId,
+            'user_id' => $user['id'],
+            'action_type' => 'create_document',
             'document_type' => $type,
             'document_id' => $documentId,
-            'sequence_stage' => ProcurementDocument::stageNumber($type),
-            'action_type' => 'create',
-            'acted_by' => $user['id'],
-            'action_note' => 'Posted ' . ProcurementDocument::label($type) . '.',
+            'before_snapshot' => null,
+            'after_snapshot' => json_encode($document, JSON_UNESCAPED_SLASHES),
+            'reason' => 'Official signed procurement document posted.',
+            'file_hash' => $fileHash,
+            'approval_reference' => null,
         ]);
-
-        // Sequence locks stay simple and explicit: once the next stage exists, the previous stage becomes read-only
-        // unless an admin later reopens it. SBB is the only optional repeatable stage and locks when resolution is posted.
-        if ($type === ProcurementDocument::TYPE_RESOLUTION) {
-            $this->lockStage($parentId, ProcurementDocument::TYPE_BID_NOTICE, $user['id'], 'Locked after resolution was posted.');
-            $this->lockStage($parentId, ProcurementDocument::TYPE_SBB, $user['id'], 'Locked after resolution was posted.');
-        } elseif ($type === ProcurementDocument::TYPE_AWARD) {
-            $this->lockStage($parentId, ProcurementDocument::TYPE_RESOLUTION, $user['id'], 'Locked after award was posted.');
-        } elseif ($type === ProcurementDocument::TYPE_CONTRACT) {
-            $this->lockStage($parentId, ProcurementDocument::TYPE_AWARD, $user['id'], 'Locked after contract was posted.');
-        } elseif ($type === ProcurementDocument::TYPE_NOTICE_TO_PROCEED) {
-            $this->lockStage($parentId, ProcurementDocument::TYPE_CONTRACT, $user['id'], 'Locked after notice to proceed was posted.');
-        }
 
         $refreshed = $this->findParentWithWorkflow($parentId);
         if ($refreshed) {
@@ -394,153 +339,96 @@ class ProcurementPostingService extends BaseService
         return ['allowed' => true, 'errors' => [], 'document_id' => $documentId];
     }
 
-    public function updateDocument(string $type, int $documentId, array $data, array $user, ?string $newFilePath = null): array
-    {
-        $documentModel = $this->documents ?? new ProcurementDocument();
-        $document = $documentModel->findById($type, $documentId);
-        if (!$document) {
-            return ['allowed' => false, 'errors' => ['Document not found.']];
-        }
-
-        $workflow = $this->findParentWithWorkflow((int) $document['parent_procurement_id']);
-        if (!$workflow) {
-            return ['allowed' => false, 'errors' => ['Procurement record not found.']];
-        }
-
-        $guard = $this->canEditDocument($type, $document, $workflow['parent'], $workflow['documents'], $user);
-        if (!$guard['allowed']) {
-            return $guard;
-        }
-
-        $documentModel->updateById($type, $documentId, [
-            'title' => $data['title'],
-            'description' => $data['description'],
-            'file_path' => $newFilePath ?? $document['file_path'],
-            'posted_at' => $data['posted_at'],
-            'updated_by' => $user['id'],
-        ]);
-
-        ($this->activityLogs ?? new ProcurementActivityLog())->create([
-            'parent_procurement_id' => $document['parent_procurement_id'],
-            'document_type' => $type,
-            'document_id' => $documentId,
-            'sequence_stage' => ProcurementDocument::stageNumber($type),
-            'action_type' => 'edit',
-            'acted_by' => $user['id'],
-            'action_note' => 'Edited ' . ProcurementDocument::label($type) . '.',
-        ]);
-
-        if ($type === ProcurementDocument::TYPE_BID_NOTICE) {
-            $parent = $workflow['parent'];
-            ($this->parents ?? new ParentProcurement())->updateById((int) $parent['id'], [
-                'reference_number' => $parent['reference_number'],
-                'procurement_title' => $data['title'],
-                'abc' => $parent['abc'],
-                'mode_of_procurement' => $parent['mode_of_procurement'],
-                'posting_date' => $data['posted_at'],
-                'bid_submission_deadline' => $parent['bid_submission_deadline'],
-                'description' => $data['description'],
-                'status' => $this->determineParentStatus(array_merge($parent, [
-                    'posting_date' => $data['posted_at'],
-                    'current_stage' => $parent['current_stage'],
-                ])),
-                'current_stage' => $parent['current_stage'],
-                'is_archived' => $parent['is_archived'],
-                'archived_at' => $parent['archived_at'] ?? null,
-                'region' => $parent['region'],
-                'branch' => $parent['branch'] ?? null,
-                'updated_by' => $user['id'],
-            ]);
-        }
-
-        return ['allowed' => true, 'errors' => []];
-    }
-
-    public function reopenDocument(string $type, int $documentId, array $user): array
-    {
-        if (($user['role'] ?? '') !== 'admin') {
-            return ['allowed' => false, 'errors' => ['Only an admin may reopen a locked stage.']];
-        }
-
-        $document = ($this->documents ?? new ProcurementDocument())->findById($type, $documentId);
-        if (!$document) {
-            return ['allowed' => false, 'errors' => ['Document not found.']];
-        }
-
-        ($this->documents ?? new ProcurementDocument())->reopen($type, $documentId, (int) $user['id']);
-        ($this->activityLogs ?? new ProcurementActivityLog())->create([
-            'parent_procurement_id' => $document['parent_procurement_id'],
-            'document_type' => $type,
-            'document_id' => $documentId,
-            'sequence_stage' => ProcurementDocument::stageNumber($type),
-            'action_type' => 'reopen',
-            'acted_by' => $user['id'],
-            'action_note' => 'Admin reopened ' . ProcurementDocument::label($type) . ' for editing.',
-        ]);
-
-        return ['allowed' => true, 'errors' => []];
-    }
-
-    public function canCreateDocument(string $type, array $parent, ?array $documents = null): array
+    public function canCreateDocument(string $type, array $parent, ?array $documents = null, ?string $postedAt = null): array
     {
         $documents = $documents ?? $this->documentsForParent((int) $parent['id']);
-        $hasBidNotice = !empty($documents[ProcurementDocument::TYPE_BID_NOTICE]);
-        $hasResolution = !empty($documents[ProcurementDocument::TYPE_RESOLUTION]);
-        $hasAward = !empty($documents[ProcurementDocument::TYPE_AWARD]);
-        $hasContract = !empty($documents[ProcurementDocument::TYPE_CONTRACT]);
-        $deadlinePassed = $this->hasBidDeadlinePassed($parent);
         $errors = [];
+        $status = $this->determinePostingStatus($parent);
 
-        if ($type !== ProcurementDocument::TYPE_BID_NOTICE && !$hasBidNotice) {
+        if (($parent['posting_status'] ?? null) === self::POSTING_STATUS_ARCHIVED || !empty($parent['archived_at'])) {
+            $errors[] = 'Archived procurement records are immutable and cannot accept new postings.';
+        }
+
+        if ($type !== ProcurementDocument::TYPE_BID_NOTICE && empty($documents[ProcurementDocument::TYPE_BID_NOTICE])) {
             $errors[] = 'Bid Notice / Invitation to Bid must be posted first.';
         }
 
+        if ($type === ProcurementDocument::TYPE_BID_NOTICE && !empty($documents[ProcurementDocument::TYPE_BID_NOTICE])) {
+            $errors[] = 'Bid Notice / Invitation to Bid already exists for this procurement.';
+        }
+
         if ($type === ProcurementDocument::TYPE_SBB) {
-            if ($deadlinePassed) {
-                $errors[] = 'Supplemental/Bid Bulletin may only be posted before the bid submission deadline.';
+            if ($status !== self::POSTING_STATUS_OPEN) {
+                $errors[] = 'Supplemental/Bid Bulletin may only be posted while bidding is open.';
             }
-            if ($hasResolution) {
-                $errors[] = 'Supplemental/Bid Bulletin may no longer be posted after Resolution has been posted.';
+            if ($postedAt !== null) {
+                if (!$this->isOnOrAfter($postedAt, (string) $parent['posting_date'])) {
+                    $errors[] = 'Supplemental/Bid Bulletin date must be on or after the Bid Notice posting date.';
+                }
+                if (!$this->isOnOrBefore($postedAt, (string) $parent['bid_submission_deadline'])) {
+                    $errors[] = 'Supplemental/Bid Bulletin date must be on or before the bid submission deadline.';
+                }
             }
         }
 
-        if ($type === ProcurementDocument::TYPE_RESOLUTION && $this->hasDocument($documents, $type)) {
-            $errors[] = 'Resolution has already been posted for this procurement.';
+        if ($type === ProcurementDocument::TYPE_RESOLUTION) {
+            if ($status !== self::POSTING_STATUS_CLOSED) {
+                $errors[] = 'Resolution may only be posted after bidding has closed.';
+            }
+            if (!empty($documents[ProcurementDocument::TYPE_RESOLUTION])) {
+                $errors[] = 'Resolution has already been posted for this procurement.';
+            }
+            if ($postedAt !== null && !$this->isAfter($postedAt, (string) $parent['bid_submission_deadline'])) {
+                $errors[] = 'Resolution date must be later than the bid submission deadline.';
+            }
         }
 
         if ($type === ProcurementDocument::TYPE_AWARD) {
-            // Any reconsideration or post-bid issue must already be resolved offline before the signed
-            // Resolution and Award are uploaded. The posting module therefore blocks Award until Resolution exists.
-            if (!$hasResolution) {
+            if ($status !== self::POSTING_STATUS_CLOSED) {
+                $errors[] = 'Notice of Award / Award may only be posted after bidding has closed.';
+            }
+            if (empty($documents[ProcurementDocument::TYPE_RESOLUTION])) {
                 $errors[] = 'Resolution must be posted before Notice of Award / Award.';
             }
-            if ($this->hasDocument($documents, $type)) {
+            if (!empty($documents[ProcurementDocument::TYPE_AWARD])) {
                 $errors[] = 'Notice of Award / Award has already been posted for this procurement.';
+            }
+            $resolutionPostedAt = $this->latestPostedAt($documents, ProcurementDocument::TYPE_RESOLUTION);
+            if ($postedAt !== null && $resolutionPostedAt !== null && !$this->isOnOrAfter($postedAt, $resolutionPostedAt)) {
+                $errors[] = 'Award date must be on or after the Resolution date.';
             }
         }
 
         if ($type === ProcurementDocument::TYPE_CONTRACT) {
-            // The winning bidder's post-award compliance is handled offline before upload.
-            // The posting system only allows Contract after the Notice of Award / Award is already posted.
-            if (!$hasAward) {
+            if ($status !== self::POSTING_STATUS_CLOSED) {
+                $errors[] = 'Contract may only be posted after bidding has closed.';
+            }
+            if (empty($documents[ProcurementDocument::TYPE_AWARD])) {
                 $errors[] = 'Notice of Award / Award must be posted before Contract.';
             }
-            if ($this->hasDocument($documents, $type)) {
+            if (!empty($documents[ProcurementDocument::TYPE_CONTRACT])) {
                 $errors[] = 'Contract has already been posted for this procurement.';
+            }
+            $awardPostedAt = $this->latestPostedAt($documents, ProcurementDocument::TYPE_AWARD);
+            if ($postedAt !== null && $awardPostedAt !== null && !$this->isOnOrAfter($postedAt, $awardPostedAt)) {
+                $errors[] = 'Contract date must be on or after the Award date.';
             }
         }
 
         if ($type === ProcurementDocument::TYPE_NOTICE_TO_PROCEED) {
-            if (!$hasContract) {
+            if ($status !== self::POSTING_STATUS_CLOSED) {
+                $errors[] = 'Notice to Proceed may only be posted after bidding has closed.';
+            }
+            if (empty($documents[ProcurementDocument::TYPE_CONTRACT])) {
                 $errors[] = 'Contract must be posted before Notice to Proceed.';
             }
-            if ($this->hasDocument($documents, $type)) {
+            if (!empty($documents[ProcurementDocument::TYPE_NOTICE_TO_PROCEED])) {
                 $errors[] = 'Notice to Proceed has already been posted for this procurement.';
             }
-        }
-
-        if ($type === ProcurementDocument::TYPE_BID_NOTICE && $hasBidNotice) {
-            $errors[] = 'Bid Notice / Invitation to Bid already exists for this procurement.';
+            $contractPostedAt = $this->latestPostedAt($documents, ProcurementDocument::TYPE_CONTRACT);
+            if ($postedAt !== null && $contractPostedAt !== null && !$this->isOnOrAfter($postedAt, $contractPostedAt)) {
+                $errors[] = 'Notice to Proceed date must be on or after the Contract date.';
+            }
         }
 
         return [
@@ -550,43 +438,11 @@ class ProcurementPostingService extends BaseService
         ];
     }
 
-    public function canEditDocument(string $type, array $document, array $parent, array $documents, array $user): array
-    {
-        $isOwner = (int) ($parent['created_by'] ?? 0) === (int) ($user['id'] ?? 0);
-        $isAdmin = ($user['role'] ?? '') === 'admin';
-        $errors = [];
-
-        if (!$isOwner && !$isAdmin) {
-            $errors[] = 'You do not have permission to edit this procurement posting.';
-        }
-
-        if ((int) ($document['is_locked'] ?? 0) === 1 && (int) ($document['is_reopened'] ?? 0) !== 1) {
-            $errors[] = (string) (($document['lock_reason'] ?? '') !== '' ? $document['lock_reason'] : 'This stage is locked because a later stage has already been posted.');
-        }
-
-        if ($type === ProcurementDocument::TYPE_SBB && ($this->hasBidDeadlinePassed($parent) || !empty($documents[ProcurementDocument::TYPE_RESOLUTION]))) {
-            $errors[] = 'Supplemental/Bid Bulletin becomes read-only once Resolution is posted or the bid submission deadline has passed.';
-        }
-
-        return [
-            'allowed' => $errors === [],
-            'errors' => $errors,
-        ];
-    }
-
     public function publicList(?string $search = null, ?string $region = null, ?string $mode = null): array
     {
         $parents = ($this->parents ?? new ParentProcurement())->findPublic($search, $region, $mode);
-        $results = [];
-        foreach ($parents as $parent) {
-            $parent = $this->refreshParentState($parent);
-            if ((int) ($parent['is_archived'] ?? 0) === 1 || ($parent['status'] ?? '') === 'pending') {
-                continue;
-            }
-            $results[] = $parent;
-        }
 
-        return $results;
+        return array_map(fn (array $parent): array => $this->refreshParentState($parent), $parents);
     }
 
     public function documentsForParent(int $parentId): array
@@ -605,51 +461,148 @@ class ProcurementPostingService extends BaseService
         $documents = $this->documentsForParent((int) $parent['id']);
         $this->persistParentState($parent, $documents);
 
-        $parent['current_stage'] = $this->currentStage($parent, $documents);
-        $parent['status'] = $this->determineParentStatus(array_merge($parent, ['current_stage' => $parent['current_stage']]));
+        $parent['current_stage'] = $this->currentStage($documents);
+        $parent['posting_status'] = $this->determinePostingStatus($parent);
 
         return $parent;
     }
 
-    private function persistParentState(array $parent, array $documents): void
+    public function isPubliclyVisible(array $parent): bool
     {
-        $currentStage = $this->currentStage($parent, $documents);
-        $status = $this->determineParentStatus(array_merge($parent, ['current_stage' => $currentStage]));
-
-        if (($parent['current_stage'] ?? null) !== $currentStage || ($parent['status'] ?? null) !== $status) {
-            ($this->parents ?? new ParentProcurement())->updateStageAndStatus((int) $parent['id'], $currentStage, $status);
-        }
+        return true;
     }
 
-    private function lockStage(int $parentId, string $type, int $userId, string $reason): void
+    public function canArchive(array $parent, array $documents, array $user, array $input): array
     {
-        $documentModel = $this->documents ?? new ProcurementDocument();
-        $documents = $documentModel->findForParent($type, $parentId);
-        if ($documents === []) {
+        $errors = [];
+        $status = $this->determinePostingStatus($parent);
+        $reason = trim((string) ($input['archive_reason'] ?? ''));
+        $approvalReference = trim((string) ($input['archive_approval_reference'] ?? ''));
+
+        if (($user['role'] ?? '') !== 'admin') {
+            $errors[] = 'Only administrators may archive procurement records.';
+        }
+
+        if (!empty($parent['archived_at'])) {
+            $errors[] = 'This procurement record is already archived.';
+        }
+
+        if ($status !== self::POSTING_STATUS_CLOSED) {
+            $errors[] = 'Archive is allowed only after the procurement is closed.';
+        }
+
+        if (empty($documents[ProcurementDocument::TYPE_NOTICE_TO_PROCEED])) {
+            $errors[] = 'Archive is allowed only after Notice to Proceed has been posted.';
+        }
+
+        if ($reason === '') {
+            $errors[] = 'Archive reason is required.';
+        }
+
+        if ($approvalReference === '') {
+            $errors[] = 'Archive approval reference is required.';
+        }
+
+        return [
+            'allowed' => $errors === [],
+            'errors' => $errors,
+        ];
+    }
+
+    public function archiveParent(int $parentId, array $user, array $input): array
+    {
+        $workflow = $this->findParentWithWorkflow($parentId);
+        if (!$workflow) {
+            return ['allowed' => false, 'errors' => ['Procurement posting not found.']];
+        }
+
+        $guard = $this->canArchive($workflow['parent'], $workflow['documents'], $user, $input);
+        if (!$guard['allowed']) {
+            return $guard;
+        }
+
+        $archivedAt = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+        $reason = trim((string) ($input['archive_reason'] ?? ''));
+        $approvalReference = trim((string) ($input['archive_approval_reference'] ?? ''));
+        ($this->parents ?? new ParentProcurement())->updateArchiveState(
+            $parentId,
+            $archivedAt,
+            self::POSTING_STATUS_ARCHIVED,
+            $reason,
+            $approvalReference,
+            (int) ($user['id'] ?? 0),
+            (int) ($user['id'] ?? 0)
+        );
+
+        ($this->activityLogs ?? new ProcurementActivityLog())->create([
+            'parent_procurement_id' => $parentId,
+            'user_id' => (int) ($user['id'] ?? 0),
+            'action_type' => 'archive',
+            'document_type' => (string) ($workflow['parent']['current_stage'] ?? ProcurementDocument::TYPE_NOTICE_TO_PROCEED),
+            'document_id' => null,
+            'before_snapshot' => json_encode($workflow['parent'], JSON_UNESCAPED_SLASHES),
+            'after_snapshot' => json_encode(array_merge($workflow['parent'], [
+                'posting_status' => self::POSTING_STATUS_ARCHIVED,
+                'archived_at' => $archivedAt,
+                'archive_reason' => $reason,
+                'archive_approval_reference' => $approvalReference,
+            ]), JSON_UNESCAPED_SLASHES),
+            'reason' => $reason,
+            'file_hash' => null,
+            'approval_reference' => $approvalReference,
+        ]);
+
+        return ['allowed' => true, 'errors' => []];
+    }
+
+    public function unarchiveParent(int $parentId, array $user): array
+    {
+        return [
+            'allowed' => false,
+            'errors' => ['Archived procurement records are immutable and cannot be restored.'],
+        ];
+    }
+
+    private function persistParentState(array $parent, array $documents): void
+    {
+        if (!empty($parent['archived_at'])) {
             return;
         }
 
-        $documentModel->lockForParent($type, $parentId, $reason);
-        foreach ($documents as $document) {
-            ($this->activityLogs ?? new ProcurementActivityLog())->create([
-                'parent_procurement_id' => $parentId,
-                'document_type' => $type,
-                'document_id' => $document['id'],
-                'sequence_stage' => ProcurementDocument::stageNumber($type),
-                'action_type' => 'lock',
-                'acted_by' => $userId,
-                'action_note' => $reason,
-            ]);
+        $currentStage = $this->currentStage($documents);
+        $postingStatus = $this->determinePostingStatus($parent);
+
+        if (
+            ($parent['current_stage'] ?? null) !== $currentStage
+            || ($parent['posting_status'] ?? null) !== $postingStatus
+        ) {
+            ($this->parents ?? new ParentProcurement())->updateWorkflowAndPostingState((int) $parent['id'], $currentStage, $postingStatus);
         }
     }
 
-    private function hasDocument(array $documents, string $type): bool
+    private function latestPostedAt(array $documents, string $type): ?string
     {
-        return !empty($documents[$type]);
+        if (empty($documents[$type])) {
+            return null;
+        }
+
+        $last = $documents[$type][count($documents[$type]) - 1];
+
+        return (string) ($last['posted_at'] ?? null);
     }
 
-    private function hasBidDeadlinePassed(array $parent): bool
+    private function isAfter(string $left, string $right): bool
     {
-        return new DateTimeImmutable((string) $parent['bid_submission_deadline']) < new DateTimeImmutable();
+        return new DateTimeImmutable($left) > new DateTimeImmutable($right);
+    }
+
+    private function isOnOrAfter(string $left, string $right): bool
+    {
+        return new DateTimeImmutable($left) >= new DateTimeImmutable($right);
+    }
+
+    private function isOnOrBefore(string $left, string $right): bool
+    {
+        return new DateTimeImmutable($left) <= new DateTimeImmutable($right);
     }
 }

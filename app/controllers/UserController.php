@@ -114,7 +114,7 @@ class UserController extends BaseController
         if (!$result['success']) {
             SessionHelper::flash('error', implode(' ', ValidationHelper::all($result['errors'])));
         } else {
-            SessionHelper::flash('success', 'User deleted and notices reassigned successfully.');
+            SessionHelper::flash('success', 'User deleted successfully.');
         }
 
         $this->redirect('users');

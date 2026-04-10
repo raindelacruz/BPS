@@ -24,17 +24,17 @@ class DashboardQueryService extends BaseService
             : $parentModel->findByCreator((int) ($currentUser['id'] ?? 0));
 
         $counts = [
-            'total_bids' => 0,
-            'pending' => 0,
-            'active' => 0,
-            'expired' => 0,
+            'total_procurements' => 0,
+            'scheduled' => 0,
+            'open' => 0,
+            'closed' => 0,
             'archived' => 0,
         ];
 
         foreach ($records as $record) {
             $record = $posting->refreshParentState($record);
-            $counts['total_bids']++;
-            $status = (string) ($record['status'] ?? '');
+            $counts['total_procurements']++;
+            $status = (string) ($record['posting_status'] ?? '');
             if (array_key_exists($status, $counts)) {
                 $counts[$status]++;
             }
