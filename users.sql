@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 14, 2026 at 07:00 AM
+-- Generation Time: Apr 14, 2026 at 07:37 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -52,10 +52,10 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `firstname`, `middle_initial`, `lastname`, `region`, `branch`, `password`, `role`, `email`, `verification_token`, `verification_code`, `token_expiry`, `is_verified`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'secretariat1', 'Secretariat', 'A', 'Officer', 'Central Office', 'Administrative and General Services Department', '$2y$10$xU0mMJ/okV9cheDamfxGfumXclp/JZHPCTEKLgNIICq2VT0HJpiBG', 'author', 'secretariat.officer@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-09 00:33:32', '2026-04-09 00:33:32'),
-(2, 'sysadmin', 'System', NULL, 'Administrator', 'Central Office', 'Administrative and General Services Department', '$2y$10$XgllwcfsWZj7qOq5SghaF.N7AanuAVD4ex/YhdZFNa2inp5I4./6y', 'admin', 'system.admin@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-09 00:33:32', '2026-04-09 00:33:32'),
-(3, 'SVProcurement', 'Jason', 'S', 'Cañares', 'Central Office', 'Administrative and General Services Department', '$2y$10$MqOJC5nklT4CEGElvMrEKeMF.y0SchG16xNE1HND1lE5fF276xtOi', 'author', 'agsd.purchasing@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-10 05:10:07', '2026-04-10 09:40:49'),
-(4, 'aacarillo', 'Angelo', 'A', 'Carillo', 'Central Office', 'Administrative and General Services Department', '$2y$10$ukahBZM1v77YScrR.OVMH.dVkKgMMdgrf5gMw2XUALwMto2sgAWkS', 'author', 'bac@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-10 05:34:30', '2026-04-10 08:13:08');
+(1, 'secretariat1', 'Secretariat', 'A', 'Officer', 'Central Office', 'Administrative and General Services Department', '/okV9cheDamfxGfumXclp/JZHPCTEKLgNIICq2VT0HJpiBG', 'author', 'secretariat.officer@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-08 16:33:32', '2026-04-08 16:33:32'),
+(2, 'sysadmin', 'System', NULL, 'Administrator', 'Central Office', 'Administrative and General Services Department', '$2y$10$4.JLDXwsMnQvNsMJp.xVH.mH2w8MQenxRagc5/Z0QQ2p8ZfQ5nQeO', 'admin', 'system.admin@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-08 16:33:32', '2026-04-14 05:35:59'),
+(3, 'SVProcurement', 'Jason', 'S', 'Cañares', 'Central Office', 'Administrative and General Services Department', '.y0SchG16xNE1HND1lE5fF276xtOi', 'author', 'agsd.purchasing@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-09 21:10:07', '2026-04-14 05:10:31'),
+(4, 'aacarillo', 'Angelo', 'A', 'Carillo', 'Central Office', 'Administrative and General Services Department', '.OVMH.dVkKgMMdgrf5gMw2XUALwMto2sgAWkS', 'author', 'bac@nfa.gov.ph', NULL, NULL, NULL, 1, 1, '2026-04-09 21:34:30', '2026-04-10 00:13:08');
 
 --
 -- Indexes for dumped tables
