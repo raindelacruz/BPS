@@ -2,6 +2,15 @@ USE `bps`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE `email_change_requests`;
+TRUNCATE TABLE `svp_ntps`;
+TRUNCATE TABLE `svp_contracts`;
+TRUNCATE TABLE `svp_awards`;
+TRUNCATE TABLE `svp_evaluation_items`;
+TRUNCATE TABLE `svp_evaluations`;
+TRUNCATE TABLE `svp_quotations`;
+TRUNCATE TABLE `svp_suppliers`;
+TRUNCATE TABLE `svp_rfq_postings`;
+TRUNCATE TABLE `svp_rfqs`;
 TRUNCATE TABLE `procurement_activity_logs`;
 TRUNCATE TABLE `notices_to_proceed`;
 TRUNCATE TABLE `contracts`;
@@ -79,6 +88,11 @@ INSERT INTO `parent_procurement` (
     `archive_approval_reference`,
     `archive_approved_by`,
     `archive_approved_at`,
+    `category`,
+    `end_user_unit`,
+    `is_svp_ntp_required`,
+    `quotation_receipt_closed_at`,
+    `completed_at`,
     `region`,
     `branch`,
     `created_by`,
@@ -99,6 +113,11 @@ INSERT INTO `parent_procurement` (
     NULL,
     NULL,
     NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0,
     NULL,
     NULL,
     'Central Office',
@@ -123,6 +142,11 @@ INSERT INTO `parent_procurement` (
     NULL,
     NULL,
     NULL,
+    NULL,
+    NULL,
+    0,
+    NULL,
+    NULL,
     'Central Office',
     'Administrative and General Services Department',
     1,
@@ -145,10 +169,42 @@ INSERT INTO `parent_procurement` (
     'ADM-ARCH-2026-001',
     2,
     '2026-04-05 10:00:00',
+    NULL,
+    NULL,
+    0,
+    NULL,
+    NULL,
     'Central Office',
     'Administrative and General Services Department',
     1,
     2
+),
+(
+    4,
+    'SVP-2026-0404',
+    'Supply and Delivery of Network Switches',
+    450000.00,
+    'small_value_procurement',
+    NULL,
+    NULL,
+    'SVP sample procurement for RFQ and quotation workflow.',
+    'closed',
+    'under_evaluation',
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    'goods',
+    'ICT Unit',
+    1,
+    '2026-04-06 17:00:00',
+    NULL,
+    'Central Office',
+    'Administrative and General Services Department',
+    1,
+    1
 );
 
 INSERT INTO `bid_notices` (
@@ -403,6 +459,82 @@ INSERT INTO `notices_to_proceed` (
     1,
     1
 );
+
+INSERT INTO `svp_rfqs` (
+    `id`,
+    `parent_procurement_id`,
+    `rfq_no`,
+    `rfq_date`,
+    `quotation_deadline`,
+    `delivery_period`,
+    `payment_terms`,
+    `warranty_terms`,
+    `technical_specs`,
+    `terms_and_conditions`,
+    `is_posting_required`,
+    `issued_at`,
+    `created_by`,
+    `updated_by`
+) VALUES
+(
+    1,
+    4,
+    'RFQ-2026-0404',
+    '2026-04-01',
+    '2026-04-05 17:00:00',
+    '30 calendar days',
+    '30 days after delivery',
+    'Standard warranty applies',
+    'Managed network switches with rack accessories.',
+    'Submit signed quotation and technical compliance sheet.',
+    1,
+    '2026-04-01 09:00:00',
+    1,
+    1
+);
+
+INSERT INTO `svp_rfq_postings` (
+    `svp_rfq_id`,
+    `posting_channel`,
+    `posting_reference`,
+    `posted_at`,
+    `posting_end_at`,
+    `remarks`,
+    `created_by`
+) VALUES
+(1, 'philgeps', 'PHILGEPS-0404', '2026-04-01 09:00:00', '2026-04-04 09:00:00', NULL, 1),
+(1, 'pe_website', 'WEB-0404', '2026-04-01 09:00:00', '2026-04-04 09:00:00', NULL, 1),
+(1, 'conspicuous_place', 'BOARD-0404', '2026-04-01 09:00:00', '2026-04-04 09:00:00', NULL, 1);
+
+INSERT INTO `svp_suppliers` (
+    `id`,
+    `parent_procurement_id`,
+    `supplier_name`,
+    `contact_person`,
+    `email`,
+    `philgeps_registration_no`,
+    `is_invited`,
+    `invited_at`
+) VALUES
+(1, 4, 'Alpha Network Supply', 'Ana Reyes', 'alpha@example.com', 'PG-001', 1, '2026-04-01 10:00:00'),
+(2, 4, 'Beta Tech Traders', 'Ben Cruz', 'beta@example.com', 'PG-002', 1, '2026-04-01 10:05:00'),
+(3, 4, 'Gamma Systems', 'Gina Santos', 'gamma@example.com', 'PG-003', 1, '2026-04-01 10:10:00');
+
+INSERT INTO `svp_quotations` (
+    `id`,
+    `parent_procurement_id`,
+    `supplier_id`,
+    `quotation_no`,
+    `quotation_date`,
+    `amount`,
+    `submission_time`,
+    `is_late`,
+    `is_responsive`,
+    `responsiveness_notes`
+) VALUES
+(1, 4, 1, 'Q-001', '2026-04-04', 420000.00, '2026-04-04 11:00:00', 0, 1, 'Complete and compliant.'),
+(2, 4, 2, 'Q-002', '2026-04-04', 430000.00, '2026-04-04 11:30:00', 0, 1, 'Responsive.'),
+(3, 4, 3, 'Q-003', '2026-04-05', 440000.00, '2026-04-05 14:00:00', 0, 0, 'Missing one compliance attachment.');
 
 INSERT INTO `procurement_activity_logs` (
     `parent_procurement_id`,

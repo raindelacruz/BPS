@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Helpers\ResponseHelper;
 use App\Models\ProcurementDocument;
 use App\Services\ProcurementPostingService;
+use App\Services\SmallValueProcurementService;
 
 class PublicNoticeController extends BaseController
 {
@@ -39,27 +40,32 @@ class PublicNoticeController extends BaseController
             ResponseHelper::abort(404, 'Public notice not found.');
         }
 
+        $isSvp = (($workflow['parent']['procurement_mode'] ?? $workflow['parent']['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE);
+        $rootType = $isSvp ? ProcurementDocument::TYPE_RFQ : ProcurementDocument::TYPE_BID_NOTICE;
+
         $this->view('public/view', [
             'title' => $workflow['parent']['procurement_title'],
             'bid' => $workflow['parent'],
             'relatedNotices' => array_values(array_filter(
                 $workflow['timeline'],
-                static fn (array $document): bool => ($document['document_type'] ?? '') !== ProcurementDocument::TYPE_BID_NOTICE
+                static fn (array $document): bool => ($document['document_type'] ?? '') !== $rootType
             )),
-            'bidNotice' => $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null,
+            'rootDocument' => $workflow['documents'][$rootType][0] ?? null,
         ], 'public');
     }
 
     public function file(array $params = []): void
     {
         $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
-        $bidNotice = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null;
+        $isSvp = $workflow && (($workflow['parent']['procurement_mode'] ?? $workflow['parent']['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE);
+        $rootType = $isSvp ? ProcurementDocument::TYPE_RFQ : ProcurementDocument::TYPE_BID_NOTICE;
+        $rootDocument = $workflow['documents'][$rootType][0] ?? null;
 
-        if (!$workflow || !$bidNotice || !$this->posting->isPubliclyVisible($workflow['parent'])) {
+        if (!$workflow || !$rootDocument || !$this->posting->isPubliclyVisible($workflow['parent'])) {
             ResponseHelper::abort(404, 'Public notice file not found.');
         }
 
-        $this->streamPdf((string) $bidNotice['file_path']);
+        $this->streamPdf((string) $rootDocument['file_path']);
     }
 
     public function documentFile(array $params = []): void

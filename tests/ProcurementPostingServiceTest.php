@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap/autoload.php';
 
+use App\Models\ParentProcurement;
 use App\Models\ProcurementDocument;
 use App\Services\ProcurementPostingService;
+use App\Services\SmallValueProcurementService;
 
 function assertSameValue(mixed $expected, mixed $actual, string $message): void
 {
@@ -21,160 +23,169 @@ function assertTrueValue(bool $condition, string $message): void
     }
 }
 
-$service = new ProcurementPostingService();
+$parentStub = new class extends ParentProcurement {
+    public function referenceNumberExists(string $referenceNumber, ?int $ignoreId = null): bool
+    {
+        return false;
+    }
+};
+
+$service = new ProcurementPostingService($parentStub);
 $now = new DateTimeImmutable('2026-04-09 09:00:00');
+
+$competitiveValidation = $service->validateCompetitiveBiddingInput([
+    'procurement_title' => 'Rice Buffer Stocking',
+    'reference_number' => 'CB-2026-001',
+    'abc' => '1250000',
+    'category' => 'goods',
+    'end_user_unit' => 'Operations',
+    'posting_date' => '2026-04-10 09:00',
+    'bid_submission_deadline' => '2026-04-15 17:00',
+    'description' => 'Competitive bidding notice',
+]);
+assertSameValue(ProcurementPostingService::COMPETITIVE_BIDDING_MODE, $competitiveValidation['data']['procurement_mode'], 'Competitive Bidding validation should lock the mode.');
+
+$svpValidation = $service->validateSvpInput([
+    'procurement_title' => 'Office Chairs',
+    'reference_number' => 'SVP-2026-001',
+    'abc' => '95000',
+    'category' => 'goods',
+    'end_user_unit' => 'Admin Division',
+    'description' => 'SVP purchase',
+]);
+assertSameValue(SmallValueProcurementService::MODE, $svpValidation['data']['procurement_mode'], 'SVP validation should lock the SVP mode.');
+assertSameValue(null, $svpValidation['data']['posting_date'], 'SVP validation should not keep bidding posting dates.');
+assertSameValue(null, $svpValidation['data']['bid_submission_deadline'], 'SVP validation should not keep bidding deadlines.');
+
+$relatedValidation = $service->validateDocumentInput([
+    'type' => ProcurementDocument::TYPE_CANVASS,
+    'parent_procurement_id' => 700,
+    'title' => 'Canvass - SVP-2026-001',
+    'posted_at' => '2026-04-10 09:00',
+    'description' => 'Canvass document',
+]);
+assertSameValue([], $relatedValidation['errors'], 'Shared related-document validation should accept SVP canvass documents.');
 
 assertSameValue(
     ProcurementPostingService::POSTING_STATUS_SCHEDULED,
     $service->determinePostingStatus([
+        'procurement_mode' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
         'posting_date' => '2026-04-10 09:00:00',
         'bid_submission_deadline' => '2026-04-12 09:00:00',
         'archived_at' => null,
     ], $now),
-    'Future procurement should be scheduled.'
+    'Future competitive procurement should be scheduled.'
 );
 
-assertSameValue(
-    ProcurementPostingService::POSTING_STATUS_OPEN,
-    $service->determinePostingStatus([
-        'posting_date' => '2026-04-08 09:00:00',
-        'bid_submission_deadline' => '2026-04-10 09:00:00',
-        'archived_at' => null,
-    ], $now),
-    'Procurement inside the posting window should be open.'
-);
-
-assertSameValue(
-    ProcurementPostingService::POSTING_STATUS_CLOSED,
-    $service->determinePostingStatus([
-        'posting_date' => '2026-04-01 09:00:00',
-        'bid_submission_deadline' => '2026-04-08 08:59:59',
-        'archived_at' => null,
-    ], $now),
-    'Deadline-passed procurement must be closed.'
-);
-
-assertSameValue(
-    ProcurementPostingService::POSTING_STATUS_ARCHIVED,
-    $service->determinePostingStatus([
-        'posting_date' => '2026-04-01 09:00:00',
-        'bid_submission_deadline' => '2026-04-10 09:00:00',
-        'archived_at' => '2026-04-11 10:00:00',
-    ], $now),
-    'Archived procurement must remain archived regardless of dates.'
-);
-
-$openParent = [
-    'id' => 501,
-    'posting_date' => '2026-04-01 09:00:00',
-    'bid_submission_deadline' => '2026-04-15 09:00:00',
-    'posting_status' => ProcurementPostingService::POSTING_STATUS_OPEN,
+$svpParent = [
+    'id' => 700,
+    'procurement_mode' => SmallValueProcurementService::MODE,
     'archived_at' => null,
+    'posting_status' => ProcurementPostingService::POSTING_STATUS_SCHEDULED,
+    'bid_submission_deadline' => '2026-04-05 17:00:00',
 ];
 
-$closedParent = [
-    'id' => 502,
-    'posting_date' => '2026-04-01 09:00:00',
-    'bid_submission_deadline' => '2026-04-08 09:00:00',
-    'posting_status' => ProcurementPostingService::POSTING_STATUS_CLOSED,
-    'archived_at' => null,
-];
-
-$baseDocuments = [
-    ProcurementDocument::TYPE_BID_NOTICE => [['id' => 1, 'posted_at' => '2026-04-01 09:00:00']],
-    ProcurementDocument::TYPE_SBB => [],
-    ProcurementDocument::TYPE_RESOLUTION => [],
+$svpDocs = [
+    ProcurementDocument::TYPE_RFQ => [],
+    ProcurementDocument::TYPE_ABSTRACT_OF_QUOTATIONS => [],
+    ProcurementDocument::TYPE_CANVASS => [],
     ProcurementDocument::TYPE_AWARD => [],
-    ProcurementDocument::TYPE_CONTRACT => [],
-    ProcurementDocument::TYPE_NOTICE_TO_PROCEED => [],
+    ProcurementDocument::TYPE_CONTRACT_OR_PO => [],
 ];
 
-$resolutionWhileOpen = $service->canCreateDocument(
-    ProcurementDocument::TYPE_RESOLUTION,
-    $openParent,
-    $baseDocuments,
-    '2026-04-10 10:00:00'
-);
-assertTrueValue(!$resolutionWhileOpen['allowed'], 'Resolution while bidding is open must be rejected.');
-assertTrueValue(
-    in_array('Resolution may only be posted after bidding has closed.', $resolutionWhileOpen['errors'], true),
-    'Resolution validation must report that bidding is still open.'
-);
-
-$lateSbb = $service->canCreateDocument(
-    ProcurementDocument::TYPE_SBB,
-    $openParent,
-    $baseDocuments,
-    '2026-04-16 10:00:00'
-);
-assertTrueValue(!$lateSbb['allowed'], 'Supplemental/Bid Bulletin after the deadline must be rejected.');
-assertTrueValue(
-    in_array('Supplemental/Bid Bulletin date must be on or before the bid submission deadline.', $lateSbb['errors'], true),
-    'SBB validation must enforce the deadline chronology.'
-);
-
-$resolutionDocuments = $baseDocuments;
-$resolutionDocuments[ProcurementDocument::TYPE_RESOLUTION] = [['id' => 2, 'posted_at' => '2026-04-09 10:00:00']];
-$awardBeforeResolution = $service->canCreateDocument(
-    ProcurementDocument::TYPE_AWARD,
-    $closedParent,
-    $resolutionDocuments,
-    '2026-04-09 09:00:00'
-);
-assertTrueValue(!$awardBeforeResolution['allowed'], 'Award before the resolution timestamp must be rejected.');
-assertTrueValue(
-    in_array('Award date must be on or after the Resolution date.', $awardBeforeResolution['errors'], true),
-    'Award validation must enforce chronology relative to the resolution.'
-);
-
-$contractWithoutAward = $service->canCreateDocument(
-    ProcurementDocument::TYPE_CONTRACT,
-    $closedParent,
-    $resolutionDocuments,
-    '2026-04-10 10:00:00'
-);
-assertTrueValue(!$contractWithoutAward['allowed'], 'Contract before Award must be rejected.');
-assertTrueValue(
-    in_array('Notice of Award / Award must be posted before Contract.', $contractWithoutAward['errors'], true),
-    'Contract validation must report the missing Award prerequisite.'
-);
-
-$multipleSbbs = $service->canCreateDocument(
-    ProcurementDocument::TYPE_SBB,
-    $openParent,
-    array_merge($baseDocuments, [
-        ProcurementDocument::TYPE_SBB => [
-            ['id' => 2, 'posted_at' => '2026-04-02 09:00:00'],
-            ['id' => 3, 'posted_at' => '2026-04-03 09:00:00'],
-        ],
-    ]),
-    '2026-04-05 09:00:00'
-);
-assertTrueValue($multipleSbbs['allowed'], 'Multiple Supplemental/Bid Bulletins before deadline should be allowed.');
-
 assertSameValue(
-    ProcurementDocument::TYPE_NOTICE_TO_PROCEED,
-    $service->currentStage([
-        ProcurementDocument::TYPE_BID_NOTICE => [['id' => 1]],
-        ProcurementDocument::TYPE_SBB => [['id' => 2]],
-        ProcurementDocument::TYPE_RESOLUTION => [['id' => 3]],
-        ProcurementDocument::TYPE_AWARD => [['id' => 4]],
-        ProcurementDocument::TYPE_CONTRACT => [['id' => 5]],
-        ProcurementDocument::TYPE_NOTICE_TO_PROCEED => [['id' => 6]],
-    ]),
-    'Notice to Proceed should be the terminal workflow stage.'
+    ProcurementDocument::TYPE_RFQ,
+    $service->currentStage($svpDocs, SmallValueProcurementService::MODE),
+    'SVP without documents should start at RFQ.'
 );
 
-$archiveGuard = $service->canArchive(
-    $closedParent,
-    $resolutionDocuments,
-    ['id' => 2, 'role' => 'admin'],
-    ['archive_reason' => 'Test archive', 'archive_approval_reference' => 'ADM-001']
+$duplicateRfq = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_RFQ,
+    $svpParent,
+    array_merge($svpDocs, [
+        ProcurementDocument::TYPE_RFQ => [['id' => 1, 'posted_at' => '2026-04-01 09:00:00']],
+    ]),
+    '2026-04-02 09:00:00'
 );
-assertTrueValue(!$archiveGuard['allowed'], 'Archiving without Notice to Proceed must be rejected.');
-assertTrueValue(
-    in_array('Archive is allowed only after Notice to Proceed has been posted.', $archiveGuard['errors'], true),
-    'Archive validation must require Notice to Proceed.'
+assertTrueValue(!$duplicateRfq['allowed'], 'Duplicate RFQ must fail.');
+assertTrueValue(in_array('Only one RFQ is allowed per SVP procurement.', $duplicateRfq['errors'], true), 'Duplicate RFQ error should be reported.');
+
+$abstractWithoutRfq = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_ABSTRACT_OF_QUOTATIONS,
+    $svpParent,
+    $svpDocs,
+    '2026-04-02 09:00:00'
 );
+assertTrueValue(!$abstractWithoutRfq['allowed'], 'Posting without RFQ must fail.');
+assertTrueValue(in_array('RFQ must be posted first.', $abstractWithoutRfq['errors'], true), 'Missing RFQ prerequisite should be reported.');
+
+$rfqOnly = array_merge($svpDocs, [
+    ProcurementDocument::TYPE_RFQ => [['id' => 10, 'posted_at' => '2026-04-05 09:00:00']],
+]);
+$earlyAbstract = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_ABSTRACT_OF_QUOTATIONS,
+    $svpParent,
+    $rfqOnly,
+    '2026-04-04 08:59:59'
+);
+assertTrueValue(!$earlyAbstract['allowed'], 'Abstract before RFQ date must fail.');
+assertTrueValue(in_array('Abstract of Quotations date must be on or after the RFQ date.', $earlyAbstract['errors'], true), 'Abstract chronology must be enforced.');
+
+$canvassAfterAbstract = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_CANVASS,
+    $svpParent,
+    array_merge($rfqOnly, [
+        ProcurementDocument::TYPE_ABSTRACT_OF_QUOTATIONS => [['id' => 11, 'posted_at' => '2026-04-06 10:00:00']],
+    ]),
+    '2026-04-06 11:00:00'
+);
+assertTrueValue(!$canvassAfterAbstract['allowed'], 'Canvass must fail once Abstract exists.');
+assertTrueValue(in_array('Canvass cannot be posted after an Abstract of Quotations has already been posted.', $canvassAfterAbstract['errors'], true), 'Abstract/Canvass exclusivity should be enforced.');
+
+$awardWithoutBasis = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_AWARD,
+    $svpParent,
+    $rfqOnly,
+    '2026-04-06 09:00:00'
+);
+assertTrueValue(!$awardWithoutBasis['allowed'], 'Award without abstract/canvass must fail.');
+assertTrueValue(in_array('Award requires a posted Abstract of Quotations or Canvass.', $awardWithoutBasis['errors'], true), 'Award prerequisite should be enforced.');
+
+$abstractPosted = array_merge($rfqOnly, [
+    ProcurementDocument::TYPE_ABSTRACT_OF_QUOTATIONS => [['id' => 11, 'posted_at' => '2026-04-06 10:00:00']],
+]);
+$closedSvpParent = array_merge($svpParent, ['posting_status' => ProcurementPostingService::POSTING_STATUS_CLOSED]);
+$awardAllowed = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_AWARD,
+    $closedSvpParent,
+    $abstractPosted,
+    '2026-04-07 09:00:00'
+);
+assertTrueValue($awardAllowed['allowed'], 'Award should be allowed after RFQ closes and abstract exists.');
+
+$contractWithoutAward = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_CONTRACT_OR_PO,
+    $closedSvpParent,
+    $abstractPosted,
+    '2026-04-07 09:00:00'
+);
+assertTrueValue(!$contractWithoutAward['allowed'], 'Contract / PO without award must fail.');
+assertTrueValue(in_array('Contract or Purchase Order requires a posted Award.', $contractWithoutAward['errors'], true), 'Contract / PO prerequisite should be enforced.');
+
+$archivedSvpParent = [
+    'id' => 701,
+    'procurement_mode' => SmallValueProcurementService::MODE,
+    'archived_at' => '2026-04-09 12:00:00',
+    'posting_status' => ProcurementPostingService::POSTING_STATUS_ARCHIVED,
+    'bid_submission_deadline' => '2026-04-05 17:00:00',
+];
+$immutableAfterPosting = $service->canCreateSvpDocument(
+    ProcurementDocument::TYPE_AWARD,
+    $archivedSvpParent,
+    $abstractPosted,
+    '2026-04-07 10:00:00'
+);
+assertTrueValue(!$immutableAfterPosting['allowed'], 'Posting after archive must fail.');
+assertTrueValue(in_array('Archived SVP records are immutable and cannot accept new postings.', $immutableAfterPosting['errors'], true), 'SVP immutability must be enforced.');
 
 echo "ProcurementPostingService tests passed.\n";

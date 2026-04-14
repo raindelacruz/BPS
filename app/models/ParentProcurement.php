@@ -8,6 +8,7 @@ class ParentProcurement extends BaseModel
     {
         $statement = $this->connection()->prepare(
             'INSERT INTO parent_procurement (
+                procurement_mode,
                 reference_number,
                 procurement_title,
                 abc,
@@ -23,11 +24,14 @@ class ParentProcurement extends BaseModel
                 archive_approval_reference,
                 archive_approved_by,
                 archive_approved_at,
+                category,
+                end_user_unit,
                 region,
                 branch,
                 created_by,
                 updated_by
             ) VALUES (
+                :procurement_mode,
                 :reference_number,
                 :procurement_title,
                 :abc,
@@ -43,6 +47,8 @@ class ParentProcurement extends BaseModel
                 :archive_approval_reference,
                 :archive_approved_by,
                 :archive_approved_at,
+                :category,
+                :end_user_unit,
                 :region,
                 :branch,
                 :created_by,
@@ -51,10 +57,11 @@ class ParentProcurement extends BaseModel
         );
 
         $statement->execute([
+            'procurement_mode' => $data['procurement_mode'],
             'reference_number' => $data['reference_number'],
             'procurement_title' => $data['procurement_title'],
             'abc' => $data['abc'],
-            'mode_of_procurement' => $data['mode_of_procurement'],
+            'mode_of_procurement' => $data['procurement_mode'],
             'posting_date' => $data['posting_date'],
             'bid_submission_deadline' => $data['bid_submission_deadline'],
             'description' => $data['description'],
@@ -66,6 +73,8 @@ class ParentProcurement extends BaseModel
             'archive_approval_reference' => $data['archive_approval_reference'] ?? null,
             'archive_approved_by' => $data['archive_approved_by'] ?? null,
             'archive_approved_at' => $data['archive_approved_at'] ?? null,
+            'category' => $data['category'] ?? null,
+            'end_user_unit' => $data['end_user_unit'] ?? null,
             'region' => $data['region'],
             'branch' => $data['branch'] ?? null,
             'created_by' => $data['created_by'],
@@ -82,6 +91,7 @@ class ParentProcurement extends BaseModel
              SET reference_number = :reference_number,
                  procurement_title = :procurement_title,
                  abc = :abc,
+                 procurement_mode = :procurement_mode,
                  mode_of_procurement = :mode_of_procurement,
                  posting_date = :posting_date,
                  bid_submission_deadline = :bid_submission_deadline,
@@ -94,6 +104,8 @@ class ParentProcurement extends BaseModel
                  archive_approval_reference = :archive_approval_reference,
                  archive_approved_by = :archive_approved_by,
                  archive_approved_at = :archive_approved_at,
+                 category = :category,
+                 end_user_unit = :end_user_unit,
                  region = :region,
                  branch = :branch,
                  updated_by = :updated_by
@@ -105,7 +117,8 @@ class ParentProcurement extends BaseModel
             'reference_number' => $data['reference_number'],
             'procurement_title' => $data['procurement_title'],
             'abc' => $data['abc'],
-            'mode_of_procurement' => $data['mode_of_procurement'],
+            'procurement_mode' => $data['procurement_mode'],
+            'mode_of_procurement' => $data['procurement_mode'],
             'posting_date' => $data['posting_date'],
             'bid_submission_deadline' => $data['bid_submission_deadline'],
             'description' => $data['description'],
@@ -117,6 +130,8 @@ class ParentProcurement extends BaseModel
             'archive_approval_reference' => $data['archive_approval_reference'] ?? null,
             'archive_approved_by' => $data['archive_approved_by'] ?? null,
             'archive_approved_at' => $data['archive_approved_at'] ?? null,
+            'category' => $data['category'] ?? null,
+            'end_user_unit' => $data['end_user_unit'] ?? null,
             'region' => $data['region'],
             'branch' => $data['branch'] ?? null,
             'updated_by' => $data['updated_by'],
@@ -176,10 +191,33 @@ class ParentProcurement extends BaseModel
         ]);
     }
 
+    public function updateOperationalState(
+        int $id,
+        ?string $category,
+        ?string $endUserUnit,
+        int $updatedBy
+    ): bool {
+        $statement = $this->connection()->prepare(
+            'UPDATE parent_procurement
+             SET category = :category,
+                 end_user_unit = :end_user_unit,
+                 updated_by = :updated_by
+             WHERE id = :id'
+        );
+
+        return $statement->execute([
+            'id' => $id,
+            'category' => $category,
+            'end_user_unit' => $endUserUnit,
+            'updated_by' => $updatedBy,
+        ]);
+    }
+
     public function findById(int $id): ?array
     {
         $statement = $this->connection()->prepare(
             'SELECT p.*,
+                    p.procurement_mode AS mode_of_procurement,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
                     creator.lastname AS creator_lastname
@@ -198,6 +236,7 @@ class ParentProcurement extends BaseModel
     {
         $statement = $this->connection()->query(
             'SELECT p.*,
+                    p.procurement_mode AS mode_of_procurement,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
                     creator.lastname AS creator_lastname
@@ -213,6 +252,7 @@ class ParentProcurement extends BaseModel
     {
         $statement = $this->connection()->prepare(
             'SELECT p.*,
+                    p.procurement_mode AS mode_of_procurement,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
                     creator.lastname AS creator_lastname
@@ -231,6 +271,7 @@ class ParentProcurement extends BaseModel
     {
         $statement = $this->connection()->prepare(
             'SELECT p.*,
+                    p.procurement_mode AS mode_of_procurement,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
                     creator.lastname AS creator_lastname
@@ -247,8 +288,9 @@ class ParentProcurement extends BaseModel
 
     public function findPublic(?string $search = null, ?string $region = null, ?string $modeOfProcurement = null): array
     {
-        $sql = 'SELECT *
-                FROM parent_procurement
+        $sql = 'SELECT p.*,
+                       p.procurement_mode AS mode_of_procurement
+                FROM parent_procurement p
                 WHERE 1 = 1';
         $params = [];
 
@@ -263,11 +305,11 @@ class ParentProcurement extends BaseModel
         }
 
         if ($modeOfProcurement !== null && $modeOfProcurement !== '') {
-            $sql .= ' AND mode_of_procurement = :mode_of_procurement';
-            $params['mode_of_procurement'] = $modeOfProcurement;
+            $sql .= ' AND p.procurement_mode = :procurement_mode';
+            $params['procurement_mode'] = $modeOfProcurement;
         }
 
-        $sql .= ' ORDER BY created_at DESC, id DESC';
+        $sql .= ' ORDER BY p.created_at DESC, p.id DESC';
         $statement = $this->connection()->prepare($sql);
         $statement->execute($params);
 
@@ -278,6 +320,7 @@ class ParentProcurement extends BaseModel
     {
         $statement = $this->connection()->prepare(
             'SELECT p.*,
+                    p.procurement_mode AS mode_of_procurement,
                     creator.username AS creator_username,
                     creator.firstname AS creator_firstname,
                     creator.lastname AS creator_lastname

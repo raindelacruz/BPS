@@ -6,14 +6,36 @@ use InvalidArgumentException;
 
 class ProcurementDocument extends BaseModel
 {
+    public const TYPE_RFQ = 'rfq';
+    public const TYPE_ABSTRACT_OF_QUOTATIONS = 'abstract_of_quotations';
+    public const TYPE_CANVASS = 'canvass';
     public const TYPE_BID_NOTICE = 'bid_notice';
     public const TYPE_SBB = 'supplemental_bid_bulletin';
     public const TYPE_RESOLUTION = 'resolution';
     public const TYPE_AWARD = 'award';
     public const TYPE_CONTRACT = 'contract';
+    public const TYPE_CONTRACT_OR_PO = 'contract_or_purchase_order';
     public const TYPE_NOTICE_TO_PROCEED = 'notice_to_proceed';
 
     public const MAP = [
+        self::TYPE_RFQ => [
+            'table' => 'rfqs',
+            'label' => 'Request for Quotation',
+            'stage' => 1,
+            'repeatable' => false,
+        ],
+        self::TYPE_ABSTRACT_OF_QUOTATIONS => [
+            'table' => 'abstract_of_quotations',
+            'label' => 'Abstract of Quotations',
+            'stage' => 2,
+            'repeatable' => false,
+        ],
+        self::TYPE_CANVASS => [
+            'table' => 'canvasses',
+            'label' => 'Canvass',
+            'stage' => 2,
+            'repeatable' => false,
+        ],
         self::TYPE_BID_NOTICE => [
             'table' => 'bid_notices',
             'label' => 'Bid Notice / Invitation to Bid',
@@ -42,6 +64,12 @@ class ProcurementDocument extends BaseModel
             'table' => 'contracts',
             'label' => 'Contract',
             'stage' => 5,
+            'repeatable' => false,
+        ],
+        self::TYPE_CONTRACT_OR_PO => [
+            'table' => 'contract_or_purchase_orders',
+            'label' => 'Contract / Purchase Order',
+            'stage' => 4,
             'repeatable' => false,
         ],
         self::TYPE_NOTICE_TO_PROCEED => [
@@ -233,6 +261,29 @@ class ProcurementDocument extends BaseModel
     public static function types(): array
     {
         return array_keys(self::MAP);
+    }
+
+    public static function competitiveTypes(): array
+    {
+        return [
+            self::TYPE_BID_NOTICE,
+            self::TYPE_SBB,
+            self::TYPE_RESOLUTION,
+            self::TYPE_AWARD,
+            self::TYPE_CONTRACT,
+            self::TYPE_NOTICE_TO_PROCEED,
+        ];
+    }
+
+    public static function svpTypes(): array
+    {
+        return [
+            self::TYPE_RFQ,
+            self::TYPE_ABSTRACT_OF_QUOTATIONS,
+            self::TYPE_CANVASS,
+            self::TYPE_AWARD,
+            self::TYPE_CONTRACT_OR_PO,
+        ];
     }
 
     private function meta(string $type): array

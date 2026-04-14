@@ -428,10 +428,25 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             background: #fef3c7;
             color: #92400e;
         }
+        .status-badge.draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-badge.posted,
         .status-badge.active,
         .status-badge.open {
             background: #dcfce7;
             color: #166534;
+        }
+        .status-badge.under_evaluation {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .status-badge.awarded,
+        .status-badge.contracted,
+        .status-badge.completed {
+            background: #ede9fe;
+            color: #6d28d9;
         }
         .status-badge.closed {
             background: #fee2e2;

@@ -7,27 +7,30 @@ use App\Models\ProcurementDocument;
 
 $workflowStageLabels = [
     'bid_notice' => 'Bid Notice / Invitation to Bid',
+    'rfq' => 'Request for Quotation',
+    'abstract_of_quotations' => 'Abstract of Quotations',
+    'canvass' => 'Canvass',
     'supplemental_bid_bulletin' => 'Supplemental/Bid Bulletin',
     'resolution' => 'Resolution',
     'award' => 'Notice of Award / Award',
     'contract' => 'Contract',
-    'notice_to_proceed' => 'Notice to Proceed',
+    'contract_or_purchase_order' => 'Contract / Purchase Order',
 ];
 
 $postingStatusLabels = [
     'scheduled' => 'Scheduled',
-    'open' => 'Open for Bids',
+    'open' => 'Open',
     'closed' => 'Closed',
     'archived' => 'Archived',
 ];
 
 $publicDocumentRows = [];
 
-if ($bidNotice) {
+if (!empty($rootDocument)) {
     $publicDocumentRows[] = [
-        'label' => ProcurementDocument::label(ProcurementDocument::TYPE_BID_NOTICE),
-        'title' => $bidNotice['title'] ?? $bid['procurement_title'],
-        'posted_at' => $bidNotice['posted_at'] ?? $bid['posting_date'] ?? null,
+        'label' => ProcurementDocument::label((string) ($rootDocument['document_type'] ?? (($bid['procurement_mode'] ?? $bid['mode_of_procurement'] ?? '') === 'svp' ? ProcurementDocument::TYPE_RFQ : ProcurementDocument::TYPE_BID_NOTICE))),
+        'title' => $rootDocument['title'] ?? $bid['procurement_title'],
+        'posted_at' => $rootDocument['posted_at'] ?? $bid['posting_date'] ?? null,
         'file_url' => ResponseHelper::url('public/notices/' . (int) $bid['id'] . '/file'),
     ];
 }
@@ -42,7 +45,7 @@ foreach ($relatedNotices as $notice) {
 }
 ?>
 <h1><?= ViewHelper::escape($bid['procurement_title']); ?></h1>
-<p>Official public procurement posting details and posted supporting documents across the full lifecycle.</p>
+<p>Official procurement posting details and posted supporting documents across the full lifecycle.</p>
 
 <dl class="detail-grid">
     <div>
@@ -55,7 +58,7 @@ foreach ($relatedNotices as $notice) {
     </div>
     <div>
         <dt>Procurement type</dt>
-        <dd><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $bid['mode_of_procurement'])); ?></dd>
+        <dd><?= ViewHelper::escape(ProcurementTypeHelper::label((string) ($bid['procurement_mode'] ?? $bid['mode_of_procurement']))); ?></dd>
     </div>
     <div>
         <dt>Workflow stage</dt>

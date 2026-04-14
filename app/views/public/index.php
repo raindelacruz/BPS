@@ -4,19 +4,21 @@ use App\Helpers\RegionBranchHelper;
 use App\Helpers\ProcurementTypeHelper;
 use App\Helpers\ResponseHelper;
 use App\Helpers\ViewHelper;
-
 $workflowStageLabels = [
     'bid_notice' => 'Bid Notice / Invitation to Bid',
+    'rfq' => 'Request for Quotation',
+    'abstract_of_quotations' => 'Abstract of Quotations',
+    'canvass' => 'Canvass',
     'supplemental_bid_bulletin' => 'Supplemental/Bid Bulletin',
     'resolution' => 'Resolution',
     'award' => 'Notice of Award / Award',
     'contract' => 'Contract',
-    'notice_to_proceed' => 'Notice to Proceed',
+    'contract_or_purchase_order' => 'Contract / Purchase Order',
 ];
 
 $postingStatusLabels = [
     'scheduled' => 'Scheduled',
-    'open' => 'Open for Bids',
+    'open' => 'Open',
     'closed' => 'Closed',
     'archived' => 'Archived',
 ];
@@ -24,7 +26,7 @@ $postingStatusLabels = [
 <div class="section-head">
     <div>
         <h2>Official Procurement Postings</h2>
-        <p>All official public procurement postings are listed here, including scheduled, open, closed, and archived lifecycle records.</p>
+        <p>All official public procurement postings are listed here, including competitive bidding and SVP records with their own computed workflow states.</p>
     </div>
     <span class="status-pill"><?= ViewHelper::escape((string) count($bids)); ?> listed</span>
 </div>
@@ -95,9 +97,9 @@ $postingStatusLabels = [
                         <td><code><?= ViewHelper::escape($bid['reference_number']); ?></code></td>
                         <td><?= ViewHelper::escape($postingStatusLabels[(string) ($bid['posting_status'] ?? 'scheduled')] ?? ucfirst((string) ($bid['posting_status'] ?? 'scheduled'))); ?></td>
                         <td><?= ViewHelper::escape($bid['region']); ?></td>
-                        <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $bid['mode_of_procurement'])); ?></td>
+                        <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) ($bid['procurement_mode'] ?? $bid['mode_of_procurement']))); ?></td>
                         <td><?= ViewHelper::escape($workflowStageLabels[(string) ($bid['current_stage'] ?? 'bid_notice')] ?? ucwords(str_replace('_', ' ', (string) ($bid['current_stage'] ?? 'bid_notice')))); ?></td>
-                        <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $bid['bid_submission_deadline']))); ?></td>
+                        <td><?= ViewHelper::escape(!empty($bid['bid_submission_deadline']) ? date('Y-m-d H:i', strtotime((string) $bid['bid_submission_deadline'])) : '-'); ?></td>
                         <td><a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('public/notices/' . (int) $bid['id'])); ?>">Open Notice</a></td>
                     </tr>
                 <?php endforeach; ?>

@@ -10,6 +10,7 @@ use App\Models\ProcurementDocument;
 use App\Models\User;
 use App\Services\FileUploadService;
 use App\Services\ProcurementPostingService;
+use App\Services\SmallValueProcurementService;
 use Bootstrap\Database;
 use Throwable;
 
@@ -50,14 +51,36 @@ class NoticeController extends BaseController
     public function create(array $params = []): void
     {
         SecurityHelper::requireAuth();
-        $user = $this->currentUser();
-        $state = $this->formState('notice-create', $this->parentDefaults($user));
-
         $this->view('notice/create', [
-            'title' => 'Create Procurement Posting',
+            'title' => 'New Procurement',
+        ]);
+    }
+
+    public function createCompetitiveBidding(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
+        $user = $this->currentUser();
+        $state = $this->formState('notice-create-competitive-bidding', $this->competitiveBiddingDefaults($user));
+
+        $this->view('notice/create_competitive_bidding', [
+            'title' => 'Create Competitive Bidding Posting',
             'errors' => $state['errors'],
             'old' => $state['old'],
-            'procurementTypes' => $this->posting->procurementTypes(),
+            'assignedRegion' => $user['region'] ?? '',
+            'assignedBranch' => $user['branch'] ?? '',
+        ]);
+    }
+
+    public function createSvp(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
+        $user = $this->currentUser();
+        $state = $this->formState('notice-create-svp', $this->svpDefaults($user));
+
+        $this->view('notice/create_svp', [
+            'title' => 'Create Small Value Procurement Record',
+            'errors' => $state['errors'],
+            'old' => $state['old'],
             'assignedRegion' => $user['region'] ?? '',
             'assignedBranch' => $user['branch'] ?? '',
         ]);
@@ -93,7 +116,7 @@ class NoticeController extends BaseController
                 'type' => $selectedType,
                 'parent_procurement_id' => $selectedParentId,
             ]),
-            'relatedTypes' => $this->posting->documentTypes(),
+            'relatedTypes' => $this->posting->relatedDocumentTypes(),
             'eligibleParents' => $eligibleParents,
             'selectedType' => $selectedType,
             'assignedBranch' => $user['branch'] ?? '',
@@ -103,20 +126,41 @@ class NoticeController extends BaseController
     public function store(array $params = []): void
     {
         SecurityHelper::requireAuth();
+        $mode = trim((string) ($_POST['procurement_mode'] ?? $_POST['mode_of_procurement'] ?? ''));
+        if ($mode === SmallValueProcurementService::MODE) {
+            $this->storeSvp($params);
+            return;
+        }
+
+        if ($mode !== ProcurementPostingService::COMPETITIVE_BIDDING_MODE) {
+            SessionHelper::flash('error', 'Choose the procurement mode first.');
+            $this->redirect('procurements/create');
+        }
+
+        $this->storeCompetitiveBidding($params);
+    }
+
+    public function storeCompetitiveBidding(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
         $user = $this->currentUser();
-        $old = array_merge($this->parentDefaults($user), [
+        $old = array_merge($this->competitiveBiddingDefaults($user), [
             'procurement_title' => trim((string) ($_POST['procurement_title'] ?? '')),
             'reference_number' => trim((string) ($_POST['reference_number'] ?? '')),
             'abc' => trim((string) ($_POST['abc'] ?? '')),
-            'mode_of_procurement' => trim((string) ($_POST['mode_of_procurement'] ?? '')),
             'posting_date' => trim((string) ($_POST['posting_date'] ?? '')),
             'bid_submission_deadline' => trim((string) ($_POST['bid_submission_deadline'] ?? '')),
             'description' => trim((string) ($_POST['description'] ?? '')),
+            'category' => trim((string) ($_POST['category'] ?? '')),
+            'end_user_unit' => trim((string) ($_POST['end_user_unit'] ?? '')),
+            'procurement_mode' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
+            'mode_of_procurement' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
         ]);
-        $this->enforceCsrfOrRedirect('notices/create', 'notice-create', $old);
-        $validation = $this->posting->validateParentInput($_POST);
+        $redirectPath = 'procurements/create/competitive-bidding';
+        $formKey = 'notice-create-competitive-bidding';
+        $this->enforceCsrfOrRedirect($redirectPath, $formKey, $old);
+        $validation = $this->posting->validateCompetitiveBiddingInput($_POST);
         $fileErrors = $this->validatePdfUpload($_FILES['notice_pdf'] ?? null, true);
-
         $errors = $validation['errors'];
         foreach ($fileErrors as $field => $messages) {
             foreach ($messages as $message) {
@@ -125,7 +169,7 @@ class NoticeController extends BaseController
         }
 
         if (ValidationHelper::hasErrors($errors)) {
-            $this->redirectWithValidation('notices/create', 'notice-create', $errors, array_merge($this->parentDefaults($user), $validation['data']));
+            $this->redirectWithValidation($redirectPath, $formKey, $errors, array_merge($this->competitiveBiddingDefaults($user), $validation['data']));
             return;
         }
 
@@ -138,8 +182,8 @@ class NoticeController extends BaseController
             $parentId = $this->posting->createParent($validation['data'], $user, $filePath);
             $connection->commit();
 
-            SessionHelper::flash('success', 'Procurement record created successfully.');
-            $this->redirect('notices/' . $parentId);
+            SessionHelper::flash('success', 'Competitive Bidding record created successfully.');
+            $this->redirect($this->competitiveBiddingWorkflowPath($parentId));
         } catch (Throwable $throwable) {
             if ($connection->inTransaction()) {
                 $connection->rollBack();
@@ -147,11 +191,60 @@ class NoticeController extends BaseController
             $this->uploads->delete($filePath);
             $this->handleFormException(
                 $throwable,
-                'Procurement record creation failed.',
-                'notices/create',
-                'Procurement posting could not be created.',
-                'notice-create',
-                array_merge($this->parentDefaults($user), $validation['data']),
+                'Competitive Bidding record creation failed.',
+                $redirectPath,
+                'Competitive Bidding record could not be created.',
+                $formKey,
+                array_merge($this->competitiveBiddingDefaults($user), $validation['data']),
+                ['user_id' => (int) ($user['id'] ?? 0)]
+            );
+        }
+    }
+
+    public function storeSvp(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
+        $user = $this->currentUser();
+        $old = array_merge($this->svpDefaults($user), [
+            'procurement_title' => trim((string) ($_POST['procurement_title'] ?? '')),
+            'reference_number' => trim((string) ($_POST['reference_number'] ?? '')),
+            'abc' => trim((string) ($_POST['abc'] ?? '')),
+            'description' => trim((string) ($_POST['description'] ?? '')),
+            'category' => trim((string) ($_POST['category'] ?? '')),
+            'end_user_unit' => trim((string) ($_POST['end_user_unit'] ?? '')),
+            'procurement_mode' => SmallValueProcurementService::MODE,
+            'mode_of_procurement' => SmallValueProcurementService::MODE,
+        ]);
+        $redirectPath = 'procurements/create/svp';
+        $formKey = 'notice-create-svp';
+        $this->enforceCsrfOrRedirect($redirectPath, $formKey, $old);
+        $validation = $this->posting->validateSvpInput($_POST);
+
+        if (ValidationHelper::hasErrors($validation['errors'])) {
+            $this->redirectWithValidation($redirectPath, $formKey, $validation['errors'], array_merge($this->svpDefaults($user), $validation['data']));
+            return;
+        }
+
+        $connection = Database::connection();
+        $connection->beginTransaction();
+
+        try {
+            $parentId = $this->posting->createParent($validation['data'], $user, '');
+            $connection->commit();
+
+            SessionHelper::flash('success', 'Small Value Procurement record created successfully.');
+            $this->redirect($this->svpWorkflowPath($parentId));
+        } catch (Throwable $throwable) {
+            if ($connection->inTransaction()) {
+                $connection->rollBack();
+            }
+            $this->handleFormException(
+                $throwable,
+                'SVP record creation failed.',
+                $redirectPath,
+                'Small Value Procurement record could not be created.',
+                $formKey,
+                array_merge($this->svpDefaults($user), $validation['data']),
                 ['user_id' => (int) ($user['id'] ?? 0)]
             );
         }
@@ -192,7 +285,7 @@ class NoticeController extends BaseController
 
         try {
             $filePath = $this->uploads->storeNoticePdf($_FILES['notice_pdf']);
-            $result = $this->posting->createDocument(
+            $result = $this->posting->createRelatedDocument(
                 $type,
                 (int) $validation['data']['parent_procurement_id'],
                 $validation['data'],
@@ -244,7 +337,21 @@ class NoticeController extends BaseController
             ResponseHelper::abort(404, 'Procurement posting not found.');
         }
 
-        $this->view('notice/view', [
+        $this->redirect($this->workflowPathForParent($workflow['parent']));
+    }
+
+    public function showCompetitiveBidding(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
+        $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
+        if (!$workflow) {
+            ResponseHelper::abort(404, 'Procurement posting not found.');
+        }
+        if (($workflow['parent']['procurement_mode'] ?? $workflow['parent']['mode_of_procurement'] ?? '') !== ProcurementPostingService::COMPETITIVE_BIDDING_MODE) {
+            $this->redirect($this->workflowPathForParent($workflow['parent']));
+        }
+
+        $this->view('notice/competitive_bidding_view', [
             'title' => $workflow['parent']['procurement_title'],
             'parent' => $workflow['parent'],
             'documents' => $workflow['documents'],
@@ -255,12 +362,39 @@ class NoticeController extends BaseController
         ]);
     }
 
+    public function showSvp(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
+        $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
+        if (!$workflow) {
+            ResponseHelper::abort(404, 'Procurement posting not found.');
+        }
+        if (($workflow['parent']['procurement_mode'] ?? $workflow['parent']['mode_of_procurement'] ?? '') !== SmallValueProcurementService::MODE) {
+            $this->redirect($this->workflowPathForParent($workflow['parent']));
+        }
+
+        $this->view('notice/svp_view', [
+            'title' => $workflow['parent']['procurement_title'],
+            'parent' => $workflow['parent'],
+            'documents' => $workflow['documents'],
+            'timeline' => $workflow['timeline'],
+            'actions' => $workflow['actions'],
+            'activityLogs' => $workflow['activityLogs'],
+            'currentUser' => $this->currentUser(),
+            'svp' => $workflow['svp'] ?? null,
+        ]);
+    }
+
     public function file(array $params = []): void
     {
         SecurityHelper::requireAuth();
         $workflow = $this->posting->findParentWithWorkflow((int) ($params['id'] ?? 0));
         if (!$workflow) {
             ResponseHelper::abort(404, 'Procurement posting not found.');
+        }
+
+        if (($workflow['parent']['procurement_mode'] ?? $workflow['parent']['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE) {
+            ResponseHelper::abort(404, 'SVP records do not use a root Bid Notice file.');
         }
 
         $bidNotice = $workflow['documents'][ProcurementDocument::TYPE_BID_NOTICE][0] ?? null;
@@ -281,6 +415,76 @@ class NoticeController extends BaseController
         }
 
         $this->streamPdf((string) $document['file_path']);
+    }
+
+    public function saveSvpRfq(array $params = []): void
+    {
+        $this->handleSvpDocumentPost((int) ($params['id'] ?? 0), ProcurementDocument::TYPE_RFQ, 'RFQ posted successfully.');
+    }
+
+    public function issueSvpRfq(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy SVP RFQ issue actions are disabled. Post the RFQ document once through the SVP workflow.');
+    }
+
+    public function saveSvpPosting(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy SVP posting-compliance actions are disabled in the document-based SVP workflow.');
+    }
+
+    public function addSvpSupplier(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy supplier actions are disabled in the document-based SVP workflow.');
+    }
+
+    public function inviteSvpSupplier(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy supplier actions are disabled in the document-based SVP workflow.');
+    }
+
+    public function addSvpQuotation(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy quotation actions are disabled in the document-based SVP workflow.');
+    }
+
+    public function setSvpQuotationResponsiveness(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy quotation actions are disabled in the document-based SVP workflow.');
+    }
+
+    public function closeSvpQuotationReceipt(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Legacy quotation actions are disabled in the document-based SVP workflow.');
+    }
+
+    public function saveSvpEvaluation(array $params = []): void
+    {
+        $this->handleSvpDocumentPost((int) ($params['id'] ?? 0), ProcurementDocument::TYPE_ABSTRACT_OF_QUOTATIONS, 'Abstract of Quotations posted successfully.');
+    }
+
+    public function saveSvpCanvass(array $params = []): void
+    {
+        $this->handleSvpDocumentPost((int) ($params['id'] ?? 0), ProcurementDocument::TYPE_CANVASS, 'Canvass posted successfully.');
+    }
+
+    public function addSvpAward(array $params = []): void
+    {
+        $this->handleSvpDocumentPost((int) ($params['id'] ?? 0), ProcurementDocument::TYPE_AWARD, 'Award posted successfully.');
+    }
+
+    public function addSvpContract(array $params = []): void
+    {
+        $this->handleSvpDocumentPost((int) ($params['id'] ?? 0), ProcurementDocument::TYPE_CONTRACT_OR_PO, 'Contract / Purchase Order posted successfully.');
+    }
+
+    public function addSvpNtp(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'SVP Notice to Proceed actions are removed. NGPA-compliant SVP uses RFQ, Abstract or Canvass, Award, and optional Contract or Purchase Order only.');
+    }
+
+    public function completeSvp(array $params = []): void
+    {
+        ResponseHelper::abort(410, 'Manual completion is disabled. SVP status is computed from posted documents.');
     }
 
     public function destroy(array $params = []): void
@@ -333,19 +537,113 @@ class NoticeController extends BaseController
         return $user;
     }
 
-    private function parentDefaults(array $user): array
+    private function competitiveBiddingDefaults(array $user): array
     {
         return [
             'procurement_title' => '',
             'reference_number' => '',
             'abc' => '',
-            'mode_of_procurement' => '',
+            'procurement_mode' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
+            'mode_of_procurement' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
             'posting_date' => '',
             'bid_submission_deadline' => '',
             'description' => '',
+            'category' => '',
+            'end_user_unit' => '',
             'assigned_region' => $user['region'] ?? '',
             'assigned_branch' => $user['branch'] ?? '',
         ];
+    }
+
+    private function svpDefaults(array $user): array
+    {
+        return [
+            'procurement_title' => '',
+            'reference_number' => '',
+            'abc' => '',
+            'procurement_mode' => SmallValueProcurementService::MODE,
+            'mode_of_procurement' => SmallValueProcurementService::MODE,
+            'description' => '',
+            'category' => '',
+            'end_user_unit' => '',
+            'assigned_region' => $user['region'] ?? '',
+            'assigned_branch' => $user['branch'] ?? '',
+        ];
+    }
+
+    private function workflowPathForParent(array $parent): string
+    {
+        return (($parent['procurement_mode'] ?? $parent['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE)
+            ? $this->svpWorkflowPath((int) $parent['id'])
+            : $this->competitiveBiddingWorkflowPath((int) $parent['id']);
+    }
+
+    private function competitiveBiddingWorkflowPath(int $parentId): string
+    {
+        return 'procurements/' . $parentId . '/workflow/competitive-bidding';
+    }
+
+    private function svpWorkflowPath(int $parentId): string
+    {
+        return 'procurements/' . $parentId . '/workflow/svp';
+    }
+
+    private function handleSvpDocumentPost(int $parentId, string $type, string $successMessage): void
+    {
+        SecurityHelper::requireAuth();
+        if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
+            SessionHelper::flash('error', 'Your session expired. Please try again.');
+            $this->redirect($this->svpWorkflowPath($parentId));
+        }
+
+        $user = $this->currentUser();
+        $workflow = $this->posting->findParentWithWorkflow($parentId);
+        if (!$workflow || (($workflow['parent']['procurement_mode'] ?? $workflow['parent']['mode_of_procurement'] ?? '') !== SmallValueProcurementService::MODE)) {
+            ResponseHelper::abort(404, 'SVP procurement record not found.');
+        }
+
+        $connection = Database::connection();
+        $connection->beginTransaction();
+        $filePath = null;
+
+        try {
+            $validation = $this->posting->validateSvpDocumentInput($_POST, $type);
+            $fileErrors = $this->validatePdfUpload($_FILES['notice_pdf'] ?? null, true);
+            foreach ($fileErrors as $messages) {
+                foreach ($messages as $message) {
+                    ValidationHelper::addError($validation['errors'], '_global', $message);
+                }
+            }
+            if (ValidationHelper::hasErrors($validation['errors'])) {
+                SessionHelper::flash('error', ValidationHelper::all($validation['errors'])[0]);
+                if ($connection->inTransaction()) {
+                    $connection->rollBack();
+                }
+                $this->redirect($this->svpWorkflowPath($parentId));
+            }
+
+            $filePath = $this->uploads->storeNoticePdf($_FILES['notice_pdf']);
+            $result = $this->posting->createSvpDocument($type, $parentId, $validation['data'], $user, $filePath);
+            if (!$result['allowed']) {
+                if ($connection->inTransaction()) {
+                    $connection->rollBack();
+                }
+                $this->uploads->delete($filePath);
+                SessionHelper::flash('error', $result['errors'][0] ?? 'SVP document could not be posted.');
+                $this->redirect($this->svpWorkflowPath($parentId));
+            }
+
+            $connection->commit();
+            SessionHelper::flash('success', $successMessage);
+        } catch (Throwable $throwable) {
+            if ($connection->inTransaction()) {
+                $connection->rollBack();
+            }
+            $this->uploads->delete($filePath);
+            SessionHelper::flash('error', $throwable->getMessage() !== '' ? $throwable->getMessage() : 'SVP action failed.');
+        }
+
+        $this->redirect($this->svpWorkflowPath($parentId));
     }
 
 }

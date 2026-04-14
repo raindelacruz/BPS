@@ -3,22 +3,25 @@
 use App\Helpers\ProcurementTypeHelper;
 use App\Helpers\ResponseHelper;
 use App\Helpers\ViewHelper;
-use App\Models\ProcurementDocument;
-
+use App\Services\ProcurementPostingService;
+use App\Services\SmallValueProcurementService;
 $postingStatusLabels = [
     'scheduled' => 'Scheduled',
-    'open' => 'Open for Bids',
-    'closed' => 'Closed for Bids',
+    'open' => 'Open',
+    'closed' => 'Closed',
     'archived' => 'Archived',
 ];
 
 $workflowStageLabels = [
     'bid_notice' => 'Bid Notice / Invitation to Bid',
+    'rfq' => 'Request for Quotation',
+    'abstract_of_quotations' => 'Abstract of Quotations',
+    'canvass' => 'Canvass',
     'supplemental_bid_bulletin' => 'Supplemental/Bid Bulletin',
     'resolution' => 'Resolution',
     'award' => 'Notice of Award / Award',
     'contract' => 'Contract',
-    'notice_to_proceed' => 'Notice to Proceed',
+    'contract_or_purchase_order' => 'Contract / Purchase Order',
 ];
 ?>
 <div class="page-head">
@@ -32,16 +35,12 @@ $workflowStageLabels = [
     <div class="page-head">
         <div>
             <h2>Actions</h2>
-            <p>Create the official bid notice first, then add downstream documents only when the legal prerequisite stage and chronology are satisfied.</p>
+            <p>Choose the procurement mode first. Competitive Bidding and Small Value Procurement now start from separate entry forms and separate workflow pages.</p>
         </div>
     </div>
     <div class="action-row">
-        <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/create')); ?>">Create procurement posting</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_SBB)); ?>">Add Supplemental/Bid Bulletin</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_RESOLUTION)); ?>">Add Resolution</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_AWARD)); ?>">Add Award</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_CONTRACT)); ?>">Add Contract</a>
-        <a class="chip-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/related/create?type=' . ProcurementDocument::TYPE_NOTICE_TO_PROCEED)); ?>">Add Notice to Proceed</a>
+        <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('procurements/create/competitive-bidding')); ?>">Create Competitive Bidding Posting</a>
+        <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('procurements/create/svp')); ?>">Create Small Value Procurement Record</a>
     </div>
 </div>
 
@@ -52,7 +51,7 @@ $workflowStageLabels = [
         <div class="page-head">
             <div>
                 <h2>Scheduled</h2>
-                <p>Official public procurement postings whose opening date has not yet arrived.</p>
+                <p>Competitive bidding records scheduled for future posting dates.</p>
             </div>
         </div>
         <?php if (empty($scheduledNotices)): ?>
@@ -74,9 +73,9 @@ $workflowStageLabels = [
                             <tr>
                                 <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
                                 <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
-                                <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $notice['posting_date']))); ?></td>
-                                <td><?= ViewHelper::escape(date('Y-m-d H:i', strtotime((string) $notice['bid_submission_deadline']))); ?></td>
-                                <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
+                                <td><?= ViewHelper::escape(!empty($notice['posting_date']) ? date('Y-m-d H:i', strtotime((string) $notice['posting_date'])) : '-'); ?></td>
+                                <td><?= ViewHelper::escape(!empty($notice['bid_submission_deadline']) ? date('Y-m-d H:i', strtotime((string) $notice['bid_submission_deadline'])) : '-'); ?></td>
+                                <td><a href="<?= ViewHelper::escape(ResponseHelper::url((($notice['procurement_mode'] ?? $notice['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE) ? 'procurements/' . (int) $notice['id'] . '/workflow/svp' : 'procurements/' . (int) $notice['id'] . '/workflow/competitive-bidding')); ?>">View</a></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -89,7 +88,7 @@ $workflowStageLabels = [
         <div class="page-head">
             <div>
                 <h2>All Procurement Records</h2>
-                <p>Workflow stage, submission deadline, and mode of procurement are tracked on the root record.</p>
+                <p>Competitive Bidding and SVP are tracked independently, with status computed from their own workflows.</p>
             </div>
         </div>
         <div class="table-wrap">
@@ -116,8 +115,8 @@ $workflowStageLabels = [
                             <td><?= ViewHelper::escape($workflowStageLabels[(string) ($notice['current_stage'] ?? 'bid_notice')] ?? ucwords(str_replace('_', ' ', (string) ($notice['current_stage'] ?? 'bid_notice')))); ?></td>
                             <td><?= ViewHelper::escape($notice['region']); ?></td>
                             <td><?= ViewHelper::escape($notice['branch'] ?? ''); ?></td>
-                            <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) $notice['mode_of_procurement'])); ?></td>
-                            <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
+                            <td><?= ViewHelper::escape(ProcurementTypeHelper::label((string) ($notice['procurement_mode'] ?? $notice['mode_of_procurement']))); ?></td>
+                            <td><a href="<?= ViewHelper::escape(ResponseHelper::url((($notice['procurement_mode'] ?? $notice['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE) ? 'procurements/' . (int) $notice['id'] . '/workflow/svp' : 'procurements/' . (int) $notice['id'] . '/workflow/competitive-bidding')); ?>">View</a></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -147,7 +146,7 @@ $workflowStageLabels = [
                             <tr>
                                 <td><strong><?= ViewHelper::escape($notice['procurement_title']); ?></strong></td>
                                 <td><code><?= ViewHelper::escape($notice['reference_number']); ?></code></td>
-                                <td><a href="<?= ViewHelper::escape(ResponseHelper::url('notices/' . (int) $notice['id'])); ?>">View</a></td>
+                                <td><a href="<?= ViewHelper::escape(ResponseHelper::url((($notice['procurement_mode'] ?? $notice['mode_of_procurement'] ?? '') === SmallValueProcurementService::MODE) ? 'procurements/' . (int) $notice['id'] . '/workflow/svp' : 'procurements/' . (int) $notice['id'] . '/workflow/competitive-bidding')); ?>">View</a></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
