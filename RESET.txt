@@ -1,0 +1,28 @@
+USE bps; -- or bps if that's the actual database
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+TRUNCATE TABLE email_change_requests;
+TRUNCATE TABLE procurement_activity_logs;
+TRUNCATE TABLE notices_to_proceed;
+TRUNCATE TABLE contract_or_purchase_orders;
+TRUNCATE TABLE contracts;
+TRUNCATE TABLE awards;
+TRUNCATE TABLE resolutions;
+TRUNCATE TABLE supplemental_bid_bulletins;
+TRUNCATE TABLE bid_notices;
+TRUNCATE TABLE canvasses;
+TRUNCATE TABLE abstract_of_quotations;
+TRUNCATE TABLE rfqs;
+TRUNCATE TABLE svp_ntps;
+TRUNCATE TABLE svp_contracts;
+TRUNCATE TABLE svp_awards;
+TRUNCATE TABLE svp_evaluation_items;
+TRUNCATE TABLE svp_evaluations;
+TRUNCATE TABLE svp_quotations;
+TRUNCATE TABLE svp_suppliers;
+TRUNCATE TABLE svp_rfq_postings;
+TRUNCATE TABLE svp_rfqs;
+TRUNCATE TABLE parent_procurement;
+
+SET FOREIGN_KEY_CHECKS = 1;
