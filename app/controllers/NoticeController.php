@@ -512,8 +512,9 @@ class NoticeController extends BaseController
             return $required ? ['notice_pdf' => ['PDF file is required.']] : [];
         }
 
-        if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-            return ['notice_pdf' => ['PDF upload failed.']];
+        $errorCode = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            return ['notice_pdf' => [$this->uploadErrorMessage($errorCode)]];
         }
 
         $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
@@ -524,6 +525,15 @@ class NoticeController extends BaseController
         }
 
         return [];
+    }
+
+    private function uploadErrorMessage(int $errorCode): string
+    {
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'PDF upload failed because the file is too large. Maximum allowed size is ' . ($this->effectiveUploadLimitLabel() ?? 'the configured upload limit') . '.',
+            UPLOAD_ERR_PARTIAL => 'PDF upload was interrupted. Please try again.',
+            default => 'PDF upload failed.',
+        };
     }
 
     private function currentUser(): array
@@ -592,7 +602,7 @@ class NoticeController extends BaseController
     {
         SecurityHelper::requireAuth();
         if (!SecurityHelper::verifyCsrf($_POST['_token'] ?? null)) {
-            SessionHelper::flash('error', 'Your session expired. Please try again.');
+            SessionHelper::flash('error', $this->csrfFailureMessage());
             $this->redirect($this->svpWorkflowPath($parentId));
         }
 
