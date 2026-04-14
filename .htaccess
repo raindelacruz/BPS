@@ -2,3 +2,9 @@ RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ public/index.php [L]
+
+<IfModule php_module>
+    php_value upload_max_filesize 200M
+    php_value post_max_size 210M
+    php_value memory_limit 256M
+</IfModule>
