@@ -50,6 +50,15 @@ class FileUploadService extends BaseService
         return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
     }
 
+    public function exists(?string $relativePath): bool
+    {
+        if (!is_string($relativePath) || trim($relativePath) === '') {
+            return false;
+        }
+
+        return is_file($this->absolutePath($relativePath));
+    }
+
     public function hash(string $relativePath): string
     {
         $absolutePath = $this->absolutePath($relativePath);
