@@ -1,28 +1,57 @@
-USE bps; -- or bps if that's the actual database
+USE bps;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
-TRUNCATE TABLE email_change_requests;
-TRUNCATE TABLE procurement_activity_logs;
-TRUNCATE TABLE notices_to_proceed;
-TRUNCATE TABLE contract_or_purchase_orders;
-TRUNCATE TABLE contracts;
-TRUNCATE TABLE awards;
-TRUNCATE TABLE resolutions;
-TRUNCATE TABLE supplemental_bid_bulletins;
-TRUNCATE TABLE bid_notices;
-TRUNCATE TABLE canvasses;
-TRUNCATE TABLE abstract_of_quotations;
-TRUNCATE TABLE rfqs;
-TRUNCATE TABLE svp_ntps;
-TRUNCATE TABLE svp_contracts;
-TRUNCATE TABLE svp_awards;
-TRUNCATE TABLE svp_evaluation_items;
-TRUNCATE TABLE svp_evaluations;
-TRUNCATE TABLE svp_quotations;
-TRUNCATE TABLE svp_suppliers;
-TRUNCATE TABLE svp_rfq_postings;
-TRUNCATE TABLE svp_rfqs;
-TRUNCATE TABLE parent_procurement;
+DELETE FROM email_change_requests;
+DELETE FROM procurement_activity_logs;
+
+DELETE FROM notices_to_proceed;
+DELETE FROM contract_or_purchase_orders;
+DELETE FROM contracts;
+DELETE FROM awards;
+DELETE FROM resolutions;
+DELETE FROM supplemental_bid_bulletins;
+DELETE FROM bid_notices;
+DELETE FROM canvasses;
+DELETE FROM abstract_of_quotations;
+DELETE FROM rfqs;
+
+DELETE FROM svp_ntps;
+DELETE FROM svp_contracts;
+DELETE FROM svp_awards;
+DELETE FROM svp_evaluation_items;
+DELETE FROM svp_evaluations;
+DELETE FROM svp_quotations;
+DELETE FROM svp_suppliers;
+DELETE FROM svp_rfq_postings;
+DELETE FROM svp_rfqs;
+
+DELETE FROM parent_procurement;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+ALTER TABLE email_change_requests AUTO_INCREMENT = 1;
+ALTER TABLE procurement_activity_logs AUTO_INCREMENT = 1;
+
+ALTER TABLE notices_to_proceed AUTO_INCREMENT = 1;
+ALTER TABLE contract_or_purchase_orders AUTO_INCREMENT = 1;
+ALTER TABLE contracts AUTO_INCREMENT = 1;
+ALTER TABLE awards AUTO_INCREMENT = 1;
+ALTER TABLE resolutions AUTO_INCREMENT = 1;
+ALTER TABLE supplemental_bid_bulletins AUTO_INCREMENT = 1;
+ALTER TABLE bid_notices AUTO_INCREMENT = 1;
+ALTER TABLE canvasses AUTO_INCREMENT = 1;
+ALTER TABLE abstract_of_quotations AUTO_INCREMENT = 1;
+ALTER TABLE rfqs AUTO_INCREMENT = 1;
+
+ALTER TABLE svp_ntps AUTO_INCREMENT = 1;
+ALTER TABLE svp_contracts AUTO_INCREMENT = 1;
+ALTER TABLE svp_awards AUTO_INCREMENT = 1;
+ALTER TABLE svp_evaluation_items AUTO_INCREMENT = 1;
+ALTER TABLE svp_evaluations AUTO_INCREMENT = 1;
+ALTER TABLE svp_quotations AUTO_INCREMENT = 1;
+ALTER TABLE svp_suppliers AUTO_INCREMENT = 1;
+ALTER TABLE svp_rfq_postings AUTO_INCREMENT = 1;
+ALTER TABLE svp_rfqs AUTO_INCREMENT = 1;
+
+ALTER TABLE parent_procurement AUTO_INCREMENT = 1;
