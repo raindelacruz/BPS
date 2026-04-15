@@ -96,7 +96,15 @@ foreach ($eligibleParents as $parent) {
                 <div id="type" class="related-create-static-field <?= ViewHelper::escape(ValidationHelper::inputClass($errors, 'type')); ?>">
                     <?= ViewHelper::escape($selectedType !== '' ? ProcurementDocument::label($selectedType) : 'No document type selected'); ?>
                 </div>
-                <input type="hidden" name="type" value="<?= ViewHelper::escape($selectedType); ?>">
+                <input
+                    type="hidden"
+                    name="type"
+                    value="<?= ViewHelper::escape($selectedType); ?>"
+                    data-confirm-include="true"
+                    data-confirm-label="Document type"
+                    data-confirm-group="Document Details"
+                    data-confirm-display-selector="#type"
+                >
                 <?php if (ValidationHelper::first($errors, 'type')): ?>
                     <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($errors, 'type')); ?></div>
                 <?php endif; ?>
@@ -107,7 +115,17 @@ foreach ($eligibleParents as $parent) {
                 <div id="parent_procurement_search" class="related-create-static-field <?= ViewHelper::escape(ValidationHelper::inputClass($errors, 'parent_procurement_id')); ?>">
                     <?= ViewHelper::escape($selectedParentLabel !== '' ? $selectedParentLabel : 'No eligible procurement record selected'); ?>
                 </div>
-                <input type="hidden" id="parent_procurement_id" name="parent_procurement_id" value="<?= ViewHelper::escape((string) $selectedParentId); ?>" required>
+                <input
+                    type="hidden"
+                    id="parent_procurement_id"
+                    name="parent_procurement_id"
+                    value="<?= ViewHelper::escape((string) $selectedParentId); ?>"
+                    data-confirm-include="true"
+                    data-confirm-label="Eligible procurement record"
+                    data-confirm-group="Document Details"
+                    data-confirm-display-selector="#parent_procurement_search"
+                    required
+                >
                 <?php if (ValidationHelper::first($errors, 'parent_procurement_id')): ?>
                     <div class="field-error"><?= ViewHelper::escape((string) ValidationHelper::first($errors, 'parent_procurement_id')); ?></div>
                 <?php endif; ?>

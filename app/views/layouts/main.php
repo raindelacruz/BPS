@@ -481,6 +481,158 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             display: inline-grid;
             gap: 6px;
         }
+        .btn-secondary {
+            background: #ffffff;
+            border-color: var(--line);
+            color: var(--muted);
+        }
+        .btn-secondary:hover {
+            background: var(--panel-soft);
+            border-color: var(--line);
+            color: var(--accent-dark);
+        }
+        .btn-loading,
+        button[disabled] {
+            cursor: wait;
+            opacity: 0.7;
+        }
+        .btn-secondary[disabled] {
+            color: #94a3b8;
+            background: #f8fafc;
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1055;
+            display: none;
+            padding: 18px 12px;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.54);
+        }
+        .modal.is-open {
+            display: block;
+        }
+        .modal-dialog {
+            width: min(100%, 900px);
+            margin: 0 auto;
+            min-height: calc(100vh - 36px);
+            display: flex;
+            align-items: center;
+        }
+        .modal-content {
+            width: 100%;
+            background: #ffffff;
+            border: 1px solid rgba(217, 226, 236, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 20px 44px rgba(15, 23, 42, 0.22);
+            overflow: hidden;
+        }
+        .modal-header,
+        .modal-body,
+        .modal-footer {
+            padding: 16px 18px;
+        }
+        .modal-header,
+        .modal-footer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--line);
+        }
+        .modal-footer {
+            border-top: 1px solid var(--line);
+            border-bottom: 0;
+        }
+        .modal-title {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        .modal-subtitle {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+        .btn-close {
+            width: 40px;
+            min-width: 40px;
+            min-height: 40px;
+            padding: 0;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--muted);
+            font-size: 1.35rem;
+            line-height: 1;
+        }
+        .btn-close:hover {
+            background: var(--panel-soft);
+            color: var(--accent-dark);
+        }
+        .confirm-summary {
+            display: grid;
+            gap: 14px;
+        }
+        .confirm-summary-group {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #fff;
+            overflow: hidden;
+        }
+        .confirm-summary-group-title {
+            margin: 0;
+            padding: 10px 14px;
+            background: var(--panel-soft);
+            border-bottom: 1px solid var(--line);
+            font-size: 0.88rem;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            color: #475569;
+        }
+        .confirm-summary-table {
+            width: 100%;
+            min-width: 0;
+        }
+        .confirm-summary-table th {
+            width: 34%;
+            background: transparent;
+        }
+        .confirm-summary-table td {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .confirm-verification {
+            display: grid;
+            gap: 6px;
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+        }
+        .confirm-verification label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .confirm-verification input[type="checkbox"] {
+            width: 18px;
+            min-width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            padding: 0;
+        }
+        .confirm-verification p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+        .modal-open {
+            overflow: hidden;
+        }
         @media (max-width: 760px) {
             .shell {
                 padding: 10px 10px 16px;
@@ -499,6 +651,35 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             }
             .form-grid.two-col {
                 grid-template-columns: 1fr;
+            }
+            .modal {
+                padding: 12px 8px;
+            }
+            .modal-dialog {
+                min-height: calc(100vh - 24px);
+            }
+            .modal-header,
+            .modal-body,
+            .modal-footer {
+                padding: 14px;
+            }
+            .modal-footer .btn-row {
+                width: 100%;
+            }
+            .modal-footer .btn-row button {
+                width: 100%;
+            }
+            .confirm-summary-table th,
+            .confirm-summary-table td {
+                display: block;
+                width: 100%;
+            }
+            .confirm-summary-table th {
+                padding-bottom: 2px;
+                border-bottom: 0;
+            }
+            .confirm-summary-table td {
+                padding-top: 0;
             }
         }
     </style>
@@ -543,5 +724,7 @@ $isAdmin = ($currentUser['role'] ?? null) === 'admin';
             </main>
         </div>
     </div>
+    <?php require app('app.views_path') . '/partials/form_confirmation_modal.php'; ?>
+    <script src="<?= ViewHelper::escape(ResponseHelper::url('assets/js/form-confirmation.js')); ?>" defer></script>
 </body>
 </html>
