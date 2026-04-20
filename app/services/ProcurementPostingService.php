@@ -439,9 +439,13 @@ class ProcurementPostingService extends BaseService
     private function documentsForParent(int $parentId, array $types): array
     {
         $documentModel = $this->documents ?? new ProcurementDocument();
+        $uploads = $this->uploads ?? new FileUploadService();
         $documents = [];
         foreach ($types as $type) {
-            $documents[$type] = $documentModel->findForParent($type, $parentId);
+            $documents[$type] = array_values(array_filter(
+                $documentModel->findForParent($type, $parentId),
+                static fn (array $document): bool => $uploads->exists($document['file_path'] ?? null)
+            ));
         }
 
         return $documents;

@@ -6,6 +6,8 @@ require dirname(__DIR__) . '/bootstrap/autoload.php';
 
 use App\Models\ParentProcurement;
 use App\Models\ProcurementDocument;
+use App\Models\ProcurementActivityLog;
+use App\Services\FileUploadService;
 use App\Services\ProcurementPostingService;
 use App\Services\SmallValueProcurementService;
 
@@ -187,5 +189,76 @@ $immutableAfterPosting = $service->canCreateSvpDocument(
 );
 assertTrueValue(!$immutableAfterPosting['allowed'], 'Posting after archive must fail.');
 assertTrueValue(in_array('Archived SVP records are immutable and cannot accept new postings.', $immutableAfterPosting['errors'], true), 'SVP immutability must be enforced.');
+
+$missingFileParentStub = new class extends ParentProcurement {
+    public function findById(int $id): ?array
+    {
+        return [
+            'id' => $id,
+            'procurement_mode' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
+            'mode_of_procurement' => ProcurementPostingService::COMPETITIVE_BIDDING_MODE,
+            'procurement_title' => 'Missing Attachment Test',
+            'reference_number' => 'CB-2026-MISSING',
+            'posting_date' => '2026-04-01 09:00:00',
+            'bid_submission_deadline' => '2026-04-20 17:00:00',
+            'description' => 'Bid notice row exists but file is missing.',
+            'posting_status' => ProcurementPostingService::POSTING_STATUS_OPEN,
+            'current_stage' => ProcurementDocument::TYPE_BID_NOTICE,
+            'archived_at' => null,
+            'branch' => 'Central',
+            'created_by' => 1,
+        ];
+    }
+
+    public function updateWorkflowAndPostingState(int $id, string $stage, string $postingStatus): bool
+    {
+        return true;
+    }
+};
+
+$missingFileDocumentStub = new class extends ProcurementDocument {
+    public function findForParent(string $type, int $parentId): array
+    {
+        if ($type !== ProcurementDocument::TYPE_BID_NOTICE) {
+            return [];
+        }
+
+        return [[
+            'id' => 900,
+            'parent_procurement_id' => $parentId,
+            'title' => 'Bid Notice',
+            'file_path' => 'storage/uploads/notices/missing.pdf',
+            'posted_at' => '2026-04-01 09:00:00',
+            'sequence_stage' => 1,
+        ]];
+    }
+};
+
+$missingFileActivityStub = new class extends ProcurementActivityLog {
+    public function findByParent(int $parentId): array
+    {
+        return [];
+    }
+};
+
+$missingFileUploadStub = new class extends FileUploadService {
+    public function exists(?string $relativePath): bool
+    {
+        return false;
+    }
+};
+
+$missingFileService = new ProcurementPostingService(
+    $missingFileParentStub,
+    $missingFileDocumentStub,
+    $missingFileActivityStub,
+    $missingFileUploadStub
+);
+
+$missingFileWorkflow = $missingFileService->findParentWithWorkflow(900);
+assertTrueValue($missingFileWorkflow !== null, 'Workflow should load for the missing-file test parent.');
+assertSameValue([], $missingFileWorkflow['documents'][ProcurementDocument::TYPE_BID_NOTICE], 'Documents with missing files must not count as posted.');
+assertTrueValue(!$missingFileWorkflow['actions'][ProcurementDocument::TYPE_SBB]['allowed'], 'Downstream posting must be blocked when the root file is missing.');
+assertTrueValue(in_array('Bid Notice must be posted first.', $missingFileWorkflow['actions'][ProcurementDocument::TYPE_SBB]['errors'], true), 'Missing root file should behave like an unposted Bid Notice.');
 
 echo "ProcurementPostingService tests passed.\n";
