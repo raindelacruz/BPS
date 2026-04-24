@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Helpers\LogHelper;
 use App\Helpers\ResponseHelper;
 use App\Models\ProcurementDocument;
 use App\Services\ProcurementPostingService;
@@ -65,7 +66,13 @@ class PublicNoticeController extends BaseController
             ResponseHelper::abort(404, 'Public notice file not found.');
         }
 
-        $this->streamPdf((string) $rootDocument['file_path']);
+        $this->streamPdf((string) $rootDocument['file_path'], [
+            'source' => 'public_root_notice',
+            'parent_procurement_id' => (int) ($workflow['parent']['id'] ?? 0),
+            'document_type' => $rootType,
+            'document_id' => (int) ($rootDocument['id'] ?? 0),
+            'reference_number' => (string) ($workflow['parent']['reference_number'] ?? ''),
+        ]);
     }
 
     public function documentFile(array $params = []): void
@@ -77,13 +84,23 @@ class PublicNoticeController extends BaseController
             ResponseHelper::abort(404, 'Public notice file not found.');
         }
 
-        $this->streamPdf((string) $document['file_path']);
+        $this->streamPdf((string) $document['file_path'], [
+            'source' => 'public_related_document',
+            'parent_procurement_id' => (int) ($document['parent_procurement_id'] ?? 0),
+            'document_type' => $type,
+            'document_id' => (int) ($document['id'] ?? 0),
+        ]);
     }
 
-    private function streamPdf(string $relativePath): void
+    private function streamPdf(string $relativePath, array $context = []): void
     {
         $absolutePath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
         if (!is_file($absolutePath)) {
+            LogHelper::error('Public notice PDF file is missing.', array_merge($context, [
+                'relative_path' => $relativePath,
+                'absolute_path' => $absolutePath,
+                'request_uri' => (string) ($_SERVER['REQUEST_URI'] ?? ''),
+            ]));
             ResponseHelper::abort(404, 'Public notice file not found.');
         }
 

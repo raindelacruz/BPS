@@ -45,6 +45,21 @@ class NoticeController extends BaseController
             'archivedNotices' => $archived,
             'currentUser' => $user,
             'documentTypes' => $this->posting->documentTypes(),
+            'missingDocumentFilesCount' => ($user['role'] ?? '') === 'admin'
+                ? count($this->posting->missingDocumentFilesReport())
+                : 0,
+        ]);
+    }
+
+    public function missingFiles(array $params = []): void
+    {
+        SecurityHelper::requireAuth();
+        SecurityHelper::requireRole('admin');
+
+        $this->view('notice/missing-files', [
+            'title' => 'Missing Document Files',
+            'currentUser' => $this->currentUser(),
+            'rows' => $this->posting->missingDocumentFilesReport(),
         ]);
     }
 

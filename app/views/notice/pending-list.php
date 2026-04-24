@@ -41,6 +41,11 @@ $workflowStageLabels = [
     <div class="action-row">
         <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('procurements/create/competitive-bidding')); ?>">Create Competitive Bidding Posting</a>
         <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('procurements/create/svp')); ?>">Create Small Value Procurement Record</a>
+        <?php if (($currentUser['role'] ?? '') === 'admin'): ?>
+            <a class="btn-link" href="<?= ViewHelper::escape(ResponseHelper::url('notices/diagnostics/missing-files')); ?>">
+                Missing Files<?= !empty($missingDocumentFilesCount) ? ' (' . (int) $missingDocumentFilesCount . ')' : ''; ?>
+            </a>
+        <?php endif; ?>
     </div>
 </div>
 

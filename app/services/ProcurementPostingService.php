@@ -391,6 +391,56 @@ class ProcurementPostingService extends BaseService
         return ['allowed' => true, 'errors' => []];
     }
 
+    public function missingDocumentFilesReport(): array
+    {
+        $documentModel = $this->documents ?? new ProcurementDocument();
+        $parentModel = $this->parents ?? new ParentProcurement();
+        $parentsById = [];
+        foreach ($parentModel->findAll() as $parent) {
+            $parentsById[(int) $parent['id']] = $parent;
+        }
+
+        $report = [];
+        foreach (ProcurementDocument::types() as $type) {
+            foreach ($documentModel->findAllForType($type) as $document) {
+                $relativePath = (string) ($document['file_path'] ?? '');
+                $absolutePath = $relativePath !== ''
+                    ? ($this->uploads ?? new FileUploadService())->absolutePath($relativePath)
+                    : '';
+
+                if ($relativePath !== '' && is_file($absolutePath)) {
+                    continue;
+                }
+
+                $parentId = (int) ($document['parent_procurement_id'] ?? 0);
+                $parent = $parentsById[$parentId] ?? null;
+                $mode = $parent ? $this->modeOf($parent) : '';
+
+                $report[] = [
+                    'document_type' => $type,
+                    'document_label' => ProcurementDocument::label($type),
+                    'document_id' => (int) ($document['id'] ?? 0),
+                    'title' => (string) ($document['title'] ?? ''),
+                    'parent_procurement_id' => $parentId,
+                    'reference_number' => (string) ($parent['reference_number'] ?? ''),
+                    'procurement_title' => (string) ($parent['procurement_title'] ?? ''),
+                    'procurement_mode' => $mode,
+                    'file_path' => $relativePath,
+                    'absolute_path' => $absolutePath,
+                    'posted_at' => (string) ($document['posted_at'] ?? ''),
+                    'public_file_url' => $this->publicFileUrlForDocument($type, $document, $parent, $mode),
+                    'workflow_url' => $parent ? $this->workflowUrlForParent($parent, $mode) : null,
+                ];
+            }
+        }
+
+        usort($report, static function (array $left, array $right): int {
+            return strcmp((string) ($right['posted_at'] ?? ''), (string) ($left['posted_at'] ?? ''));
+        });
+
+        return $report;
+    }
+
     public function unarchiveParent(int $parentId, array $user): array
     {
         return ['allowed' => false, 'errors' => ['Archived procurement records are immutable and cannot be restored.']];
@@ -618,6 +668,30 @@ class ProcurementPostingService extends BaseService
         ]);
 
         return $documentId;
+    }
+
+    private function publicFileUrlForDocument(string $type, array $document, ?array $parent, string $mode): ?string
+    {
+        if ($parent === null) {
+            return null;
+        }
+
+        if ($mode === self::COMPETITIVE_BIDDING_MODE && $type === ProcurementDocument::TYPE_BID_NOTICE) {
+            return 'public/notices/' . (int) $parent['id'] . '/file';
+        }
+
+        if ($mode === self::SVP_MODE && $type === ProcurementDocument::TYPE_RFQ) {
+            return 'public/notices/' . (int) $parent['id'] . '/file';
+        }
+
+        return 'public/documents/' . $type . '/' . (int) ($document['id'] ?? 0) . '/file';
+    }
+
+    private function workflowUrlForParent(array $parent, string $mode): string
+    {
+        return $mode === self::SVP_MODE
+            ? 'procurements/' . (int) $parent['id'] . '/workflow/svp'
+            : 'procurements/' . (int) $parent['id'] . '/workflow/competitive-bidding';
     }
 
     private function modeOf(array $record): string

@@ -163,6 +163,22 @@ class ProcurementDocument extends BaseModel
         return $statement->fetchAll() ?: [];
     }
 
+    public function findAllForType(string $type): array
+    {
+        $meta = $this->meta($type);
+        $statement = $this->connection()->query(
+            'SELECT d.*,
+                    creator.username AS creator_username,
+                    creator.firstname AS creator_firstname,
+                    creator.lastname AS creator_lastname
+             FROM ' . $meta['table'] . ' d
+             INNER JOIN users creator ON creator.id = d.created_by
+             ORDER BY d.posted_at DESC, d.id DESC'
+        );
+
+        return $statement->fetchAll() ?: [];
+    }
+
     public function findOneForParent(string $type, int $parentId): ?array
     {
         $documents = $this->findForParent($type, $parentId);

@@ -32,6 +32,7 @@ router()->get('/profile', [ProfileController::class, 'show']);
 router()->post('/profile', [ProfileController::class, 'update']);
 router()->post('/profile/password', [ProfileController::class, 'updatePassword']);
 router()->get('/notices', [NoticeController::class, 'index']);
+router()->get('/notices/diagnostics/missing-files', [NoticeController::class, 'missingFiles']);
 router()->get('/procurements/create', [NoticeController::class, 'create']);
 router()->get('/procurements/create/competitive-bidding', [NoticeController::class, 'createCompetitiveBidding']);
 router()->post('/procurements/competitive-bidding', [NoticeController::class, 'storeCompetitiveBidding']);
