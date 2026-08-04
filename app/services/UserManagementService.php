@@ -1,0 +1,321 @@
+<?php
+
+namespace App\Services;
+
+use App\Helpers\LogHelper;
+use App\Helpers\RegionBranchHelper;
+use App\Helpers\ValidationHelper;
+use App\Models\EmailChangeRequest;
+use App\Models\ParentProcurement;
+use App\Models\ProcurementActivityLog;
+use App\Models\ProcurementDocument;
+use App\Models\User;
+use Bootstrap\Database;
+use DateInterval;
+use DateTimeImmutable;
+use Throwable;
+
+class UserManagementService extends BaseService
+{
+    public function __construct(
+        private readonly ?User $users = null,
+        private readonly ?ParentProcurement $parents = null,
+        private readonly ?ProcurementDocument $documents = null,
+        private readonly ?ProcurementActivityLog $activityLogs = null,
+        private readonly ?EmailChangeRequest $emailChangeRequests = null,
+        private readonly ?EmailService $emailService = null
+    ) {
+    }
+
+    public function listUsers(array $filters = []): array
+    {
+        $users = ($this->users ?? new User())->all();
+        $search = strtolower(trim((string) ($filters['search'] ?? '')));
+        $region = trim((string) ($filters['region'] ?? ''));
+        $role = trim((string) ($filters['role'] ?? ''));
+        $status = trim((string) ($filters['status'] ?? ''));
+
+        return array_values(array_filter($users, static function (array $user) use ($search, $region, $role, $status): bool {
+            if ($search !== '') {
+                $fullName = trim((string) ($user['firstname'] ?? '') . ' '
+                    . ((string) ($user['middle_initial'] ?? '') !== '' ? (string) $user['middle_initial'] . '. ' : '')
+                    . (string) ($user['lastname'] ?? ''));
+                $haystack = strtolower($fullName . ' ' . (string) ($user['username'] ?? ''));
+
+                if (strpos($haystack, $search) === false) {
+                    return false;
+                }
+            }
+
+            if ($region !== '' && (string) ($user['region'] ?? '') !== $region) {
+                return false;
+            }
+
+            if ($role !== '' && (string) ($user['role'] ?? '') !== $role) {
+                return false;
+            }
+
+            if ($status === 'active' && (int) ($user['is_active'] ?? 0) !== 1) {
+                return false;
+            }
+
+            if ($status === 'inactive' && (int) ($user['is_active'] ?? 0) === 1) {
+                return false;
+            }
+
+            return true;
+        }));
+    }
+
+    public function updateUser(int $targetUserId, array $input, array $currentUser): array
+    {
+        $users = $this->users ?? new User();
+        $emailChangeRequests = $this->emailChangeRequests ?? new EmailChangeRequest();
+        $emailService = $this->emailService ?? new EmailService();
+        $target = $users->findById($targetUserId);
+
+        if (!$target) {
+            return ['success' => false, 'errors' => ['_global' => ['User not found.']]];
+        }
+
+        $data = [
+            'username' => trim((string) ($input['username'] ?? '')),
+            'firstname' => trim((string) ($target['firstname'] ?? '')),
+            'middle_initial' => strtoupper(substr(trim((string) ($target['middle_initial'] ?? '')), 0, 1)),
+            'lastname' => trim((string) ($target['lastname'] ?? '')),
+            'region' => trim((string) ($input['region'] ?? '')),
+            'branch' => trim((string) ($input['branch'] ?? '')),
+            'role' => trim((string) ($input['role'] ?? '')),
+            'email' => strtolower(trim((string) ($input['email'] ?? ''))),
+            'status' => trim((string) ($input['status'] ?? '')),
+            'password' => (string) ($input['password'] ?? ''),
+            'password_confirmation' => (string) ($input['password_confirmation'] ?? ''),
+        ];
+
+        $errors = [];
+
+        foreach (['username', 'firstname', 'lastname', 'region', 'branch', 'role', 'email'] as $field) {
+            if ($data[$field] === '') {
+                ValidationHelper::addError($errors, $field, ucfirst(str_replace('_', ' ', $field)) . ' is required.');
+            }
+        }
+
+        if ($data['region'] !== '' && !RegionBranchHelper::isValidRegion($data['region'])) {
+            ValidationHelper::addError($errors, 'region', 'Region is invalid.');
+        }
+
+        if (
+            $data['region'] !== ''
+            && $data['branch'] !== ''
+            && !RegionBranchHelper::branchBelongsToRegion($data['region'], $data['branch'])
+        ) {
+            ValidationHelper::addError($errors, 'branch', 'Branch does not match the selected region.');
+        }
+
+        if (!in_array($data['role'], ['admin', 'author'], true)) {
+            ValidationHelper::addError($errors, 'role', 'Role is invalid.');
+        }
+
+        if (!in_array($data['status'], ['active', 'inactive'], true)) {
+            ValidationHelper::addError($errors, 'status', 'Status is invalid.');
+        }
+
+        if ($data['middle_initial'] !== '' && !preg_match('/^[A-Z]$/', $data['middle_initial'])) {
+            ValidationHelper::addError($errors, 'middle_initial', 'Middle initial must be a single letter.');
+        }
+
+        if (!preg_match('/^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.gov\.ph$/i', $data['email'])) {
+            ValidationHelper::addError($errors, 'email', 'Email must use a valid .gov.ph address.');
+        }
+
+        if ($users->usernameExistsForOther($data['username'], $targetUserId)) {
+            ValidationHelper::addError($errors, 'username', 'Username is already in use.');
+        }
+
+        if ($users->emailExistsForOther($data['email'], $targetUserId)) {
+            ValidationHelper::addError($errors, 'email', 'Email is already in use.');
+        }
+
+        if ((int) $currentUser['id'] === $targetUserId && $data['role'] !== ($target['role'] ?? null)) {
+            ValidationHelper::addError($errors, 'role', 'You cannot change your own role.');
+        }
+
+        if ((int) $currentUser['id'] === $targetUserId && $data['status'] === 'inactive') {
+            ValidationHelper::addError($errors, 'status', 'You cannot deactivate your own account.');
+        }
+
+        if ($data['password'] !== '' || $data['password_confirmation'] !== '') {
+            if ($data['password'] === '') {
+                ValidationHelper::addError($errors, 'password', 'New password is required.');
+            }
+
+            if ($data['password_confirmation'] === '') {
+                ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation is required.');
+            }
+
+            if ($data['password'] !== $data['password_confirmation']) {
+                ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation does not match.');
+            }
+        }
+
+        if (ValidationHelper::hasErrors($errors)) {
+            return ['success' => false, 'errors' => $errors];
+        }
+
+        $connection = Database::connection();
+        $connection->beginTransaction();
+
+        try {
+            $emailChanged = $data['email'] !== (string) $target['email'];
+            $userUpdate = array_merge($target, $data, [
+                'email' => $emailChanged ? (string) $target['email'] : $data['email'],
+            ]);
+
+            $users->updateById($targetUserId, $userUpdate);
+
+            $isActive = $data['status'] === 'active';
+            if ((int) ($target['is_active'] ?? 0) !== (int) $isActive) {
+                $users->updateActiveState($targetUserId, $isActive);
+            }
+
+            if ($data['password'] !== '') {
+                $users->updatePassword($targetUserId, password_hash($data['password'], PASSWORD_DEFAULT));
+            }
+
+            if ($emailChanged) {
+                $emailChangeRequests->cancelPendingForUser($targetUserId);
+
+                $expiresAt = (new DateTimeImmutable())->add(new DateInterval('P1D'))->format('Y-m-d H:i:s');
+                $token = bin2hex(random_bytes(32));
+
+                $requestId = $emailChangeRequests->create([
+                    'user_id' => $targetUserId,
+                    'current_email' => $target['email'],
+                    'new_email' => $data['email'],
+                    'token' => $token,
+                    'expires_at' => $expiresAt,
+                ]);
+
+                $emailService->sendEmailChangeNotice(
+                    $data['email'],
+                    trim($data['firstname'] . ' ' . $data['lastname']),
+                    $token,
+                    new DateTimeImmutable($expiresAt)
+                );
+            }
+
+            $connection->commit();
+
+            return ['success' => true, 'errors' => []];
+        } catch (Throwable $throwable) {
+            if ($connection->inTransaction()) {
+                $connection->rollBack();
+            }
+
+            LogHelper::error('User update failed.', [
+                'target_user_id' => $targetUserId,
+                'current_user_id' => (int) ($currentUser['id'] ?? 0),
+            ], $throwable);
+
+            return ['success' => false, 'errors' => ['_global' => ['User could not be updated.']]];
+        }
+    }
+
+    public function toggleActiveState(int $targetUserId, array $currentUser): array
+    {
+        $users = $this->users ?? new User();
+        $target = $users->findById($targetUserId);
+
+        if (!$target) {
+            return ['success' => false, 'errors' => ['_global' => ['User not found.']]];
+        }
+
+        if ((int) $currentUser['id'] === $targetUserId) {
+            return ['success' => false, 'errors' => ['_global' => ['You cannot deactivate your own account.']]];
+        }
+
+        $nextState = (int) ($target['is_active'] ?? 0) !== 1;
+        $users->updateActiveState($targetUserId, $nextState);
+
+        return ['success' => true, 'errors' => []];
+    }
+
+    public function deleteUser(int $targetUserId, array $currentUser): array
+    {
+        $users = $this->users ?? new User();
+        $parents = $this->parents ?? new ParentProcurement();
+        $documents = $this->documents ?? new ProcurementDocument();
+        $activityLogs = $this->activityLogs ?? new ProcurementActivityLog();
+        $target = $users->findById($targetUserId);
+
+        if (!$target) {
+            return ['success' => false, 'errors' => ['_global' => ['User not found.']]];
+        }
+
+        if ((int) $currentUser['id'] === $targetUserId) {
+            return ['success' => false, 'errors' => ['_global' => ['You cannot delete your own account.']]];
+        }
+
+        if (
+            $parents->hasAnyOwnershipReferences($targetUserId)
+            || $documents->hasAnyOwnershipReferences($targetUserId)
+            || $activityLogs->hasAnyUserReferences($targetUserId)
+        ) {
+            return ['success' => false, 'errors' => ['_global' => ['Users referenced by procurement records or audit logs cannot be deleted.']]];
+        }
+
+        $connection = Database::connection();
+        $connection->beginTransaction();
+
+        try {
+            $users->deleteById($targetUserId);
+            $connection->commit();
+
+            return ['success' => true, 'errors' => []];
+        } catch (Throwable $throwable) {
+            if ($connection->inTransaction()) {
+                $connection->rollBack();
+            }
+
+            LogHelper::error('User deletion failed.', [
+                'target_user_id' => $targetUserId,
+                'current_user_id' => (int) ($currentUser['id'] ?? 0),
+            ], $throwable);
+
+            return ['success' => false, 'errors' => ['_global' => ['User could not be deleted.']]];
+        }
+    }
+
+    public function verifyEmailChangeToken(string $token): array
+    {
+        $users = $this->users ?? new User();
+        $requests = $this->emailChangeRequests ?? new EmailChangeRequest();
+        $request = $requests->findPendingByToken($token);
+
+        if (!$request) {
+            return ['success' => false, 'errors' => ['_global' => ['Email change token is invalid or expired.']]];
+        }
+
+        $connection = Database::connection();
+        $connection->beginTransaction();
+
+        try {
+            $users->updateEmailById((int) $request['user_id'], (string) $request['new_email']);
+            $requests->markCompleted((int) $request['id']);
+            $connection->commit();
+
+            return ['success' => true, 'errors' => []];
+        } catch (Throwable $throwable) {
+            if ($connection->inTransaction()) {
+                $connection->rollBack();
+            }
+
+            LogHelper::error('Email change verification failed.', [
+                'request_id' => (int) ($request['id'] ?? 0),
+                'user_id' => (int) ($request['user_id'] ?? 0),
+            ], $throwable);
+
+            return ['success' => false, 'errors' => ['_global' => ['Email change could not be completed.']]];
+        }
+    }
+}
