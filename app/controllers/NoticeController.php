@@ -533,14 +533,54 @@ class NoticeController extends BaseController
             return ['notice_pdf' => ['PDF upload failed.']];
         }
 
+        $maxBytes = max(1, (int) app('app.max_upload_bytes', 20 * 1024 * 1024));
+        if ((int) ($file['size'] ?? 0) > $maxBytes) {
+            return ['notice_pdf' => ['PDF file is too large. Maximum size is ' . $this->formatBytes($maxBytes) . '.']];
+        }
+
         $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $tmpName = (string) ($file['tmp_name'] ?? '');
         $mimeType = strtolower((string) ($file['type'] ?? ''));
 
-        if ($extension !== 'pdf' && $mimeType !== 'application/pdf') {
+        if ($tmpName === '' || !is_file($tmpName)) {
+            return ['notice_pdf' => ['Uploaded file is invalid.']];
+        }
+
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $detectedMimeType = finfo_file($finfo, $tmpName);
+                finfo_close($finfo);
+                if (is_string($detectedMimeType) && $detectedMimeType !== '') {
+                    $mimeType = strtolower($detectedMimeType);
+                }
+            }
+        }
+
+        if ($extension !== 'pdf' || $mimeType !== 'application/pdf') {
             return ['notice_pdf' => ['Only PDF uploads are allowed.']];
         }
 
+        $handle = fopen($tmpName, 'rb');
+        $signature = is_resource($handle) ? fread($handle, 5) : false;
+        if (is_resource($handle)) {
+            fclose($handle);
+        }
+
+        if ($signature !== '%PDF-') {
+            return ['notice_pdf' => ['Uploaded file content is not a valid PDF.']];
+        }
+
         return [];
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes >= 1024 * 1024) {
+            return number_format($bytes / 1024 / 1024, 1) . ' MB';
+        }
+
+        return number_format($bytes / 1024, 1) . ' KB';
     }
 
     private function currentUser(): array

@@ -320,7 +320,14 @@ class ProcurementPostingService extends BaseService
 
     public function isPubliclyVisible(array $parent): bool
     {
-        return !empty($parent['posting_status']) && (string) ($parent['posting_status'] ?? '') !== self::POSTING_STATUS_SCHEDULED;
+        if (!empty($parent['archived_at'])) {
+            return false;
+        }
+
+        $status = (string) ($parent['posting_status'] ?? '');
+        $visibleStatuses = $this->publicVisibleStatuses();
+
+        return in_array($status, $visibleStatuses, true);
     }
 
     public function canArchive(array $parent, array $documents, array $user, array $input): array
@@ -454,6 +461,25 @@ class ProcurementPostingService extends BaseService
         }
 
         return $validation;
+    }
+
+    private function publicVisibleStatuses(): array
+    {
+        $default = [self::POSTING_STATUS_OPEN, self::POSTING_STATUS_CLOSED];
+        $configured = function_exists('app')
+            ? app('app.public_visible_statuses', $default)
+            : $default;
+
+        if (!is_array($configured) || $configured === []) {
+            return $default;
+        }
+
+        $statuses = array_values(array_filter(array_map(
+            static fn (mixed $status): string => trim((string) $status),
+            $configured
+        )));
+
+        return $statuses === [] ? $default : $statuses;
     }
 
     private function validatePostedDocumentInput(array $input, array $allowedTypes): array

@@ -1,0 +1,8 @@
+RewriteEngine On
+Options -Indexes
+
+RewriteRule (^|/)(\.htaccess|\.env|.*\.log|.*\.sql|.*\.bak|.*\.backup|.*\.old|.*\.orig|.*\.save|.*\.ini)$ - [F,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]

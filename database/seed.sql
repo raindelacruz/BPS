@@ -2,6 +2,7 @@ USE `bps`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE `email_change_requests`;
+TRUNCATE TABLE `password_reset_requests`;
 TRUNCATE TABLE `svp_ntps`;
 TRUNCATE TABLE `svp_contracts`;
 TRUNCATE TABLE `svp_awards`;

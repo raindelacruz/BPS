@@ -98,4 +98,47 @@ class LoginAttemptLog extends BaseModel
 
         return $statement->fetchAll() ?: [];
     }
+
+    public function countRecentFailures(?string $username, ?string $ipAddress, int $minutes): int
+    {
+        $minutes = max(1, $minutes);
+        $conditions = [
+            'event_type = :event_type',
+            'outcome = :outcome',
+            'created_at >= DATE_SUB(NOW(), INTERVAL ' . $minutes . ' MINUTE)',
+        ];
+        $parameters = [
+            'event_type' => 'login_attempt',
+            'outcome' => 'failure',
+        ];
+
+        $identityConditions = [];
+        $username = trim((string) $username);
+        $ipAddress = trim((string) $ipAddress);
+
+        if ($username !== '') {
+            $identityConditions[] = 'username_entered = :username_entered';
+            $parameters['username_entered'] = $username;
+        }
+
+        if ($ipAddress !== '') {
+            $identityConditions[] = 'ip_address = :ip_address';
+            $parameters['ip_address'] = $ipAddress;
+        }
+
+        if ($identityConditions === []) {
+            return 0;
+        }
+
+        $conditions[] = '(' . implode(' OR ', $identityConditions) . ')';
+
+        $statement = $this->connection()->prepare(
+            'SELECT COUNT(*)
+             FROM login_attempt_logs
+             WHERE ' . implode(' AND ', $conditions)
+        );
+        $statement->execute($parameters);
+
+        return (int) $statement->fetchColumn();
+    }
 }

@@ -28,6 +28,7 @@ class App
     {
         try {
             $this->assertSchemaIntegrity();
+            $this->sendSecurityHeaders();
             $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
             $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
@@ -91,8 +92,38 @@ class App
             }
 
             session_name($this->config('app.session_name', 'ebps_session'));
+            ini_set('session.use_strict_mode', '1');
+            ini_set('session.use_only_cookies', '1');
+            ini_set('session.cookie_httponly', '1');
+
+            $isHttps = strtolower((string) ($_SERVER['HTTPS'] ?? '')) !== 'off'
+                && (string) ($_SERVER['HTTPS'] ?? '') !== '';
+            $isHttps = $isHttps
+                || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https'
+                || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '')) === 'on'
+                || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443';
+
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => '/',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
             session_start();
         }
+    }
+
+    private function sendSecurityHeaders(): void
+    {
+        if (PHP_SAPI === 'cli' || headers_sent()) {
+            return;
+        }
+
+        header('X-Frame-Options: SAMEORIGIN');
+        header('X-Content-Type-Options: nosniff');
+        header('Referrer-Policy: same-origin');
+        header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
     }
 
     private function loadRoutes(): void

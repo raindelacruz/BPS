@@ -98,6 +98,71 @@ class AuthController extends BaseController
         $this->redirect('login');
     }
 
+    public function showForgotPassword(array $params = []): void
+    {
+        SecurityHelper::requireGuest();
+        $state = $this->formState('forgot-password', ['email' => '']);
+
+        $this->view('auth/forgot-password', [
+            'title' => 'Forgot Password',
+            'errors' => $state['errors'],
+            'old' => $state['old'],
+        ]);
+    }
+
+    public function sendPasswordReset(array $params = []): void
+    {
+        SecurityHelper::requireGuest();
+        $old = [
+            'email' => strtolower(trim((string) ($_POST['email'] ?? ''))),
+        ];
+        $this->enforceCsrfOrRedirect('password/forgot', 'forgot-password', $old);
+
+        $result = $this->authService->requestPasswordReset($_POST);
+
+        if ($result['success']) {
+            $this->redirect('login');
+        }
+
+        $this->redirectWithValidation('password/forgot', 'forgot-password', $result['errors'], $old);
+    }
+
+    public function showResetPassword(array $params = []): void
+    {
+        SecurityHelper::requireGuest();
+        $token = trim((string) ($_GET['token'] ?? ''));
+        $state = $this->formState('reset-password', [
+            'token' => $token,
+            'password' => '',
+            'password_confirmation' => '',
+        ]);
+
+        $this->view('auth/reset-password', [
+            'title' => 'Reset Password',
+            'errors' => $state['errors'],
+            'old' => $state['old'],
+        ]);
+    }
+
+    public function resetPassword(array $params = []): void
+    {
+        SecurityHelper::requireGuest();
+        $old = [
+            'token' => trim((string) ($_POST['token'] ?? '')),
+            'password' => '',
+            'password_confirmation' => '',
+        ];
+        $this->enforceCsrfOrRedirect('password/reset?token=' . urlencode($old['token']), 'reset-password', $old);
+
+        $result = $this->authService->resetPassword($_POST);
+
+        if ($result['success']) {
+            $this->redirect('login');
+        }
+
+        $this->redirectWithValidation('password/reset?token=' . urlencode($old['token']), 'reset-password', $result['errors'], $old);
+    }
+
     private function registrationDefaults(): array
     {
         return [

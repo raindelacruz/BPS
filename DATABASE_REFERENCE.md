@@ -1,5 +1,9 @@
 # Database Reference
 
+## Production Note
+
+This file documents the earlier legacy `notices` table design and should be treated as historical reference only. The current production runtime uses `parent_procurement` plus dedicated immutable document tables. See `PRODUCTION_RULES.md` for the active production rules.
+
 ## Overview
 The current eBPS workflow is backed by three core tables:
 - `users`

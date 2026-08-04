@@ -16,7 +16,7 @@ class FileUploadService extends BaseService
             mkdir($directory, 0775, true);
         }
 
-        $filename = uniqid('notice_', true) . '.pdf';
+        $filename = 'notice_' . bin2hex(random_bytes(16)) . '.pdf';
         $destination = rtrim($directory, '/\\') . DIRECTORY_SEPARATOR . $filename;
 
         if (is_uploaded_file($file['tmp_name'])) {

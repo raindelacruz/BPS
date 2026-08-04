@@ -1,5 +1,9 @@
 # System Design
 
+## Production Note
+
+This document describes the earlier target MVC design and still references the legacy `notices` table workflow in several sections. The current production copy uses `parent_procurement` plus dedicated procurement document tables. See `PRODUCTION_RULES.md` for the active production rules.
+
 ## Purpose
 This document defines the target PHP/MySQL MVC application design for the eBPS system based on the current implemented behavior of the existing codebase. It is intended to serve as the architectural source of truth before implementation.
 

@@ -1,2 +1,4 @@
+storage/baselines/*
+storage/logs/*
 storage/temp/sessions/*
 storage/uploads/notices/*

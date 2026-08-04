@@ -190,4 +190,21 @@ $immutableAfterPosting = $service->canCreateSvpDocument(
 assertTrueValue(!$immutableAfterPosting['allowed'], 'Posting after archive must fail.');
 assertTrueValue(in_array('Archived SVP records are immutable and cannot accept new postings.', $immutableAfterPosting['errors'], true), 'SVP immutability must be enforced.');
 
+assertTrueValue(
+    $service->isPubliclyVisible(['posting_status' => ProcurementPostingService::POSTING_STATUS_OPEN, 'archived_at' => null]),
+    'Open procurement records should be publicly visible.'
+);
+assertTrueValue(
+    $service->isPubliclyVisible(['posting_status' => ProcurementPostingService::POSTING_STATUS_CLOSED, 'archived_at' => null]),
+    'Closed procurement records should remain publicly visible as procurement history.'
+);
+assertTrueValue(
+    !$service->isPubliclyVisible(['posting_status' => ProcurementPostingService::POSTING_STATUS_SCHEDULED, 'archived_at' => null]),
+    'Scheduled procurement records should not be publicly visible.'
+);
+assertTrueValue(
+    !$service->isPubliclyVisible(['posting_status' => ProcurementPostingService::POSTING_STATUS_ARCHIVED, 'archived_at' => '2026-04-09 12:00:00']),
+    'Archived procurement records should not be publicly visible.'
+);
+
 echo "ProcurementPostingService tests passed.\n";

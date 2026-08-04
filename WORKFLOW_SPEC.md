@@ -1,5 +1,9 @@
 # Workflow Specification
 
+## Production Note
+
+This file records the earlier legacy notice workflow. The current production workflow is normalized around `parent_procurement` and dedicated document tables. See `PRODUCTION_RULES.md` for the active production rules, including public visibility and archive behavior.
+
 ## Overview
 This document defines the current eBPS business workflow as implemented in the existing system. It is written as an implementation-ready specification for future MVC development.
 

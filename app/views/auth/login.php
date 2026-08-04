@@ -36,5 +36,8 @@ use App\Helpers\ViewHelper;
     </form>
 
     <div class="muted">Need access first time?</div>
-    <a href="<?= ViewHelper::escape(ResponseHelper::url('register')); ?>">Create an account</a>
+    <div class="btn-row">
+        <a href="<?= ViewHelper::escape(ResponseHelper::url('register')); ?>">Create an account</a>
+        <a href="<?= ViewHelper::escape(ResponseHelper::url('password/forgot')); ?>">Forgot password?</a>
+    </div>
 </div>

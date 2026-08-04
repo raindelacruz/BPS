@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 04, 2026 at 02:03 AM
+-- Generation Time: Aug 04, 2026 at 05:09 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -327,7 +327,14 @@ INSERT INTO `login_attempt_logs` (`id`, `user_id`, `username_entered`, `event_ty
 (35, 4, 'aacarillo', 'login_attempt', 'failure', 'invalid_password', 'Password verification failed for an existing user.', '192.168.104.153', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-03 10:08:40'),
 (36, 5, 'superadmin', 'login_attempt', 'failure', 'invalid_password', 'Password verification failed for an existing user.', '192.168.104.32', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-03 23:57:03'),
 (37, 2, 'sysadmin', 'login_attempt', 'failure', 'invalid_password', 'Password verification failed for an existing user.', '192.168.104.32', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-03 23:57:17'),
-(38, 2, 'sysadmin', 'login_attempt', 'success', NULL, 'User logged in successfully.', '192.168.104.32', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-04 00:00:11');
+(38, 2, 'sysadmin', 'login_attempt', 'success', NULL, 'User logged in successfully.', '192.168.104.32', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-04 00:00:11'),
+(39, NULL, 'codexreset2a0b1865', 'login_attempt', 'failure', 'invalid_password', 'Password verification failed for an existing user.', NULL, NULL, NULL, NULL, NULL, '2026-08-04 02:29:45'),
+(40, NULL, 'codexreset2a0b1865', 'login_attempt', 'success', NULL, 'User logged in successfully.', NULL, NULL, NULL, NULL, NULL, '2026-08-04 02:29:45'),
+(41, NULL, 'codexreset2a0b1865', 'logout', 'success', NULL, 'User logged out.', NULL, NULL, NULL, NULL, NULL, '2026-08-04 02:29:45'),
+(42, 2, 'sysadmin', 'login_attempt', 'failure', 'invalid_password', 'Password verification failed for an existing user.', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-04 03:00:33'),
+(43, 2, 'sysadmin', 'login_attempt', 'success', NULL, 'User logged in successfully.', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-04 03:00:47'),
+(44, 2, 'sysadmin', 'logout', 'success', NULL, 'User logged out.', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/logout', NULL, '2026-08-04 03:00:50'),
+(45, 2, 'sysadmin', 'login_attempt', 'success', NULL, 'User logged in successfully.', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 'POST', '/BPS/public/login', NULL, '2026-08-04 03:09:03');
 
 --
 -- Triggers `login_attempt_logs`
@@ -470,6 +477,21 @@ CREATE TRIGGER `tr_parent_procurement_no_delete` BEFORE DELETE ON `parent_procur
 END
 $$
 DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `password_reset_requests`
+--
+
+CREATE TABLE `password_reset_requests` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1011,6 +1033,14 @@ ALTER TABLE `parent_procurement`
   ADD KEY `fk_parent_procurement_updated_by_users` (`updated_by`);
 
 --
+-- Indexes for table `password_reset_requests`
+--
+ALTER TABLE `password_reset_requests`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_password_reset_requests_token_hash` (`token_hash`),
+  ADD KEY `idx_password_reset_requests_user_active` (`user_id`,`used_at`,`expires_at`);
+
+--
 -- Indexes for table `procurement_activity_logs`
 --
 ALTER TABLE `procurement_activity_logs`
@@ -1178,7 +1208,7 @@ ALTER TABLE `email_change_requests`
 -- AUTO_INCREMENT for table `login_attempt_logs`
 --
 ALTER TABLE `login_attempt_logs`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
 
 --
 -- AUTO_INCREMENT for table `notices_to_proceed`
@@ -1191,6 +1221,12 @@ ALTER TABLE `notices_to_proceed`
 --
 ALTER TABLE `parent_procurement`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `password_reset_requests`
+--
+ALTER TABLE `password_reset_requests`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `procurement_activity_logs`
@@ -1274,7 +1310,7 @@ ALTER TABLE `svp_suppliers`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- Constraints for dumped tables
@@ -1356,6 +1392,12 @@ ALTER TABLE `parent_procurement`
   ADD CONSTRAINT `fk_parent_procurement_archived_by_users` FOREIGN KEY (`archived_by`) REFERENCES `users` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_parent_procurement_created_by_users` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_parent_procurement_updated_by_users` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON UPDATE CASCADE;
+
+--
+-- Constraints for table `password_reset_requests`
+--
+ALTER TABLE `password_reset_requests`
+  ADD CONSTRAINT `fk_password_reset_requests_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `procurement_activity_logs`

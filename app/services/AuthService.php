@@ -7,8 +7,11 @@ use App\Helpers\RegionBranchHelper;
 use App\Helpers\SessionHelper;
 use App\Helpers\ValidationHelper;
 use App\Models\LoginAttemptLog;
+use App\Models\PasswordReset;
 use App\Models\User;
 use Bootstrap\Database;
+use DateInterval;
+use DateTimeImmutable;
 use Throwable;
 
 class AuthService extends BaseService
@@ -17,10 +20,21 @@ class AuthService extends BaseService
 
     private LoginAttemptLog $loginLogs;
 
-    public function __construct(?User $users = null, ?LoginAttemptLog $loginLogs = null)
+    private PasswordReset $passwordResets;
+
+    private EmailService $emailService;
+
+    public function __construct(
+        ?User $users = null,
+        ?LoginAttemptLog $loginLogs = null,
+        ?PasswordReset $passwordResets = null,
+        ?EmailService $emailService = null
+    )
     {
         $this->users = $users ?? new User();
         $this->loginLogs = $loginLogs ?? new LoginAttemptLog();
+        $this->passwordResets = $passwordResets ?? new PasswordReset();
+        $this->emailService = $emailService ?? new EmailService();
     }
 
     public function register(array $input): array
@@ -151,6 +165,11 @@ class AuthService extends BaseService
             return ['success' => false, 'errors' => $errors];
         }
 
+        $rateLimit = $this->loginRateLimitGuard($username);
+        if ($rateLimit !== null) {
+            return $rateLimit;
+        }
+
         $user = $this->users->findByUsername($username);
 
         if (!$user) {
@@ -275,6 +294,37 @@ class AuthService extends BaseService
         }
     }
 
+    private function loginRateLimitGuard(string $username): ?array
+    {
+        $maxAttempts = max(1, (int) app('app.login_max_attempts', 5));
+        $decayMinutes = max(1, (int) app('app.login_decay_minutes', 15));
+        $ipAddress = $this->clientIpAddress();
+        $recentFailures = $this->loginLogs->countRecentFailures($username, $ipAddress, $decayMinutes);
+
+        if ($recentFailures < $maxAttempts) {
+            return null;
+        }
+
+        $this->recordLoginEvent([
+            'username_entered' => $username,
+            'event_type' => 'login_attempt',
+            'outcome' => 'failure',
+            'failure_reason' => 'rate_limited',
+            'message' => 'Login attempt blocked by rate limit.',
+            'context' => [
+                'window_minutes' => $decayMinutes,
+                'max_attempts' => $maxAttempts,
+            ],
+        ]);
+
+        return [
+            'success' => false,
+            'errors' => [
+                '_global' => ['Too many failed login attempts. Please wait before trying again.'],
+            ],
+        ];
+    }
+
     private function clientIpAddress(): ?string
     {
         $candidates = [
@@ -329,6 +379,95 @@ class AuthService extends BaseService
         }
 
         SessionHelper::flash('success', 'Password updated successfully.');
+
+        return ['success' => true, 'errors' => []];
+    }
+
+    public function requestPasswordReset(array $input): array
+    {
+        $email = strtolower(trim((string) ($input['email'] ?? '')));
+        $errors = [];
+
+        if ($email === '') {
+            ValidationHelper::addError($errors, 'email', 'Email is required.');
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            ValidationHelper::addError($errors, 'email', 'Enter a valid email address.');
+        }
+
+        if (ValidationHelper::hasErrors($errors)) {
+            return ['success' => false, 'errors' => $errors];
+        }
+
+        $user = $this->users->findByEmail($email);
+
+        if ($user && (int) ($user['is_active'] ?? 0) === 1) {
+            $token = bin2hex(random_bytes(32));
+            $expiresAt = (new DateTimeImmutable())->add(new DateInterval('PT30M'));
+            $created = $this->passwordResets->create(
+                (int) $user['id'],
+                hash('sha256', $token),
+                $expiresAt->format('Y-m-d H:i:s')
+            );
+
+            if ($created) {
+                $this->emailService->sendPasswordReset(
+                    (string) $user['email'],
+                    trim((string) ($user['firstname'] ?? '') . ' ' . (string) ($user['lastname'] ?? '')),
+                    $token,
+                    $expiresAt
+                );
+            }
+        }
+
+        SessionHelper::flash('success', 'If an active account matches that email, a password reset link has been sent.');
+
+        return ['success' => true, 'errors' => []];
+    }
+
+    public function resetPassword(array $input): array
+    {
+        $token = trim((string) ($input['token'] ?? ''));
+        $newPassword = (string) ($input['password'] ?? '');
+        $confirmation = (string) ($input['password_confirmation'] ?? '');
+        $errors = [];
+
+        if ($token === '') {
+            ValidationHelper::addError($errors, '_global', 'Password reset link is invalid or expired.');
+        }
+
+        if ($newPassword === '') {
+            ValidationHelper::addError($errors, 'password', 'New password is required.');
+        }
+
+        if ($confirmation === '') {
+            ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation is required.');
+        }
+
+        if ($newPassword !== $confirmation) {
+            ValidationHelper::addError($errors, 'password_confirmation', 'Password confirmation does not match.');
+        }
+
+        $resetRequest = $token === ''
+            ? null
+            : $this->passwordResets->findValidByTokenHash(hash('sha256', $token));
+
+        if (!$resetRequest) {
+            ValidationHelper::addError($errors, '_global', 'Password reset link is invalid or expired.');
+        }
+
+        if (ValidationHelper::hasErrors($errors)) {
+            return ['success' => false, 'errors' => $errors];
+        }
+
+        $userId = (int) $resetRequest['user_id'];
+        $updated = $this->users->updatePassword($userId, password_hash($newPassword, PASSWORD_DEFAULT));
+
+        if (!$updated) {
+            return ['success' => false, 'errors' => ['_global' => ['Password could not be updated.']]];
+        }
+
+        $this->passwordResets->markUsed((int) $resetRequest['id']);
+        SessionHelper::flash('success', 'Password reset successfully. You may now log in.');
 
         return ['success' => true, 'errors' => []];
     }

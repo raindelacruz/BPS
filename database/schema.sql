@@ -28,6 +28,7 @@ DROP TRIGGER IF EXISTS `tr_login_attempt_logs_no_update`;
 DROP TRIGGER IF EXISTS `tr_login_attempt_logs_no_delete`;
 
 DROP TABLE IF EXISTS `email_change_requests`;
+DROP TABLE IF EXISTS `password_reset_requests`;
 DROP TABLE IF EXISTS `login_attempt_logs`;
 DROP TABLE IF EXISTS `contract_or_purchase_orders`;
 DROP TABLE IF EXISTS `canvasses`;
@@ -102,6 +103,22 @@ CREATE TABLE `login_attempt_logs` (
         FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
         ON UPDATE CASCADE
         ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `password_reset_requests` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `token_hash` CHAR(64) NOT NULL,
+    `expires_at` DATETIME NOT NULL,
+    `used_at` DATETIME NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_password_reset_requests_token_hash` (`token_hash`),
+    KEY `idx_password_reset_requests_user_active` (`user_id`, `used_at`, `expires_at`),
+    CONSTRAINT `fk_password_reset_requests_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `parent_procurement` (

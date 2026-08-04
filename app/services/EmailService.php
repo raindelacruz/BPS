@@ -44,6 +44,26 @@ class EmailService extends BaseService
         return $this->deliver($email, $subject, $message);
     }
 
+    public function sendPasswordReset(
+        string $email,
+        string $recipientName,
+        string $token,
+        DateTimeInterface $expiresAt
+    ): bool {
+        $subject = 'eBPS Password Reset';
+        $message = implode(PHP_EOL, [
+            'Hello ' . trim($recipientName) . ',',
+            '',
+            'A password reset was requested for your eBPS account.',
+            'Reset link: ' . rtrim((string) app('app.url'), '/') . '/password/reset?token=' . urlencode($token),
+            'This link expires on ' . $expiresAt->format('Y-m-d H:i:s') . '.',
+            '',
+            'If you did not request this, you can ignore this email.',
+        ]);
+
+        return $this->deliver($email, $subject, $message);
+    }
+
     private function deliver(string $email, string $subject, string $message): bool
     {
         $transport = strtolower((string) app('mail.transport', 'smtp'));
